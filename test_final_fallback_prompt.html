@@ -17,7 +17,7 @@
   <ul id="messages"></ul>
 
   <script>
-    const socket = io("http://localhost:3000"); // Change to your server/ngrok URL when deployed
+    const socket = io("https://eef7-2401-4900-8844-e630-7017-ba0d-19d4-79c6.ngrok-free.app"); // Change to your server/ngrok URL when deployed
     let userId = localStorage.getItem('userId');
     if (!userId) {
       userId = crypto.randomUUID();
