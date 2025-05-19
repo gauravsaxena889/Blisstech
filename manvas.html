@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manvas Room (Auto-Join + Dynamic API + Logs)</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    #log { font-family: monospace; white-space: pre; margin-top: 20px; background: #f0f0f0; padding: 10px; max-height: 250px; overflow-y: auto; }
+    #qr { margin-top: 20px; }
+    input { padding: 5px; }
+    button { padding: 5px 10px; }
+  </style>
+</head>
+<body>
+  <h2>Manvas Room (Auto-Join + Dynamic API + Logs)</h2>
+  <div>
+    <button onclick="createRoom()">Create New Room</button>
+    <input id="roomInput" placeholder="Enter Room ID" />
+    <button onclick="joinRoom()">Join</button>
+    <button onclick="manualPing()">🔁 Manual Ping to Mobile</button>
+  </div>
+  <div id="status"></div>
+  <div id="qr"></div>
+  <div id="log"></div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script>
+    const apiBaseUrl = "https://eef7-2401-4900-8844-e630-7017-ba0d-19d4-79c6.ngrok-free.app"; // CHANGE this as needed
+    const socket = io(apiBaseUrl, { transports: ["websocket"] });
+    const userId = crypto.randomUUID();
+    let role = "web";
+    let roomId = null;
+
+    const log = msg => {
+      const el = document.getElementById("log");
+      const now = new Date().toLocaleTimeString();
+      el.innerText += `[${now}] ${msg}\n`;
+      el.scrollTop = el.scrollHeight;
+    };
+
+    const showQR = (roomId, userId) => {
+      const qrDiv = document.getElementById("qr");
+      const qrUrl = `${window.location.origin}${window.location.pathname}?roomId=${roomId}&userId=${userId}&role=mobile&api=${encodeURIComponent(apiBaseUrl)}`;
+      QRCode.toDataURL(qrUrl).then(url => {
+        qrDiv.innerHTML = '<p>📱 Scan this QR to join from fallback device:</p><img src="' + url + '" width="200" height="200"/>';
+        log(`✅ QR generated using dynamic path: ${qrUrl}`);
+      });
+    };
+
+    const updateStatus = () => {
+      const s = document.getElementById("status");
+      s.innerHTML = `🔗 <b>Joined Room:</b> ${roomId} as ${role}<br/><small>User ID: ${userId}</small>`;
+    };
+
+    const joinRoom = () => {
+      roomId = document.getElementById("roomInput").value.trim();
+      if (!roomId) return alert("Enter room ID");
+
+      fetch(apiBaseUrl + "/join-room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId })
+      })
+      .then(res => {
+        if (!res.ok) throw new Error("Room join failed");
+        log("✅ Join-room success");
+        socket.emit("join-room", { roomId, userId, role });
+        updateStatus();
+        if (role === "web") showQR(roomId, userId);
+      })
+      .catch(err => log("❌ Join error: " + err.message));
+    };
+
+    const createRoom = () => {
+      fetch(apiBaseUrl + "/create-room", { method: "POST" })
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("roomInput").value = data.roomId;
+          joinRoom();
+        });
+    };
+
+    const manualPing = () => {
+      if (role === "mobile") return log("❌ Cannot ping from mobile role.");
+      socket.emit("manual-ping", { roomId, userId });
+      log("🔁 Manual ping sent to mobile");
+    };
+
+    // Auto join if query has info
+    window.onload = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("roomId") && params.get("role") && params.get("userId")) {
+        roomId = params.get("roomId");
+        role = params.get("role");
+        document.getElementById("roomInput").value = roomId;
+        log(`⚙️ Auto-join triggered. Room ${roomId}, Role: ${role}`);
+        updateStatus();
+        socket.emit("join-room", { roomId, userId: params.get("userId"), role });
+      }
+    };
+
+    socket.on("connect", () => log(`✅ Connected to socket. ID: ${socket.id}`));
+    socket.on("web-disconnected", data => log("⚠️ Web disconnected. Prompting fallback..."));
+    socket.on("manual-ping", () => {
+      if (role === "mobile") log("📶 Manual ping received from web!");
+    });
+    socket.on("connect_error", err => log("❌ Connect error: " + err.message));
+  </script>
+</body>
+</html>
