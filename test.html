@@ -10,58 +10,52 @@
   <button onclick="joinRoom()">Join Room</button>
   <ul id="messages"></ul>
 
- <script>
-  const socket = io("https://d1ce-2401-4900-8844-e630-6cd0-217f-37c3-a1ac.ngrok-free.app");
+  <script>
+    // Replace with your actual ngrok URL
+    const NGROK_URL = "https://3eed-2401-4900-8844-e630-6cd0-217f-37c3-a1ac.ngrok-free.app";
 
-  async function joinRoom() {
-    const roomId = document.getElementById('roomId').value;
+    const socket = io(NGROK_URL);
 
-    // Step 1: Verify with backend before joining
-    try {
-      const res = await fetch('/join-room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId })
-      });
+    async function joinRoom() {
+      const roomId = document.getElementById('roomId').value;
 
-      const data = await res.json();
+      // Step 1: Verify with backend before joining
+      try {
+        const res = await fetch(`${NGROK_URL}/join-room`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ roomId })
+        });
 
-      if (res.ok && data.success) {
-        localStorage.setItem('lastRoomId', roomId);
+        if (!res.ok) {
+          const err = await res.json();
+          log(`⚠️ Error: ${err.error}`);
+          return;
+        }
+
+        // Step 2: Join via socket
         socket.emit("join-room", roomId);
         log(`✅ Joined room ${roomId}`);
-      } else {
-        log(`❌ Room not found: ${roomId}`);
+      } catch (error) {
+        log(`⚠️ Error: ${error.message}`);
       }
-    } catch (err) {
-      log(`⚠️ Error: ${err.message}`);
     }
-  }
 
-  // Listener
-  socket.on("user-joined", id => {
-    log(`👤 User joined: ${id}`);
-  });
+    socket.on("user-joined", (id) => {
+      log(`👥 User joined: ${id}`);
+    });
 
-  socket.on("room-error", msg => {
-    log(`❌ Error: ${msg}`);
-  });
+    socket.on("room-error", (msg) => {
+      log(`⚠️ Error: ${msg}`);
+    });
 
-  function log(msg) {
-    const item = document.createElement('li');
-    item.innerText = msg;
-    document.getElementById('messages').appendChild(item);
-  }
-
-  // Optional: Auto-reconnect to last room
-  window.onload = () => {
-    const lastRoomId = localStorage.getItem('lastRoomId');
-    if (lastRoomId) {
-      document.getElementById('roomId').value = lastRoomId;
-      joinRoom();
+    function log(msg) {
+      const item = document.createElement('li');
+      item.innerText = msg;
+      document.getElementById("messages").appendChild(item);
     }
-  };
-</script>
-
+  </script>
 </body>
 </html>
