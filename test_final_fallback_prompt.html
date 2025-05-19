@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manvas Room – Fallback Enabled</title>
+  <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+</head>
+<body>
+  <h2>Manvas Live Room</h2>
+  <div>
+    <button onclick="createRoom()">Create New Room</button>
+    <input type="text" id="roomIdInput" placeholder="Or Enter Room ID" />
+    <button onclick="manualJoin()">Join</button>
+  </div>
+
+  <div id="roomInfo" style="margin-top: 20px;"></div>
+  <div id="qrDisplay" style="margin-top: 10px;"></div>
+  <ul id="messages"></ul>
+
+  <script>
+    const socket = io("http://localhost:3000"); // Change to your server/ngrok URL when deployed
+    let userId = localStorage.getItem('userId');
+    if (!userId) {
+      userId = crypto.randomUUID();
+      localStorage.setItem('userId', userId);
+    }
+
+    // Infer role based on device type
+    let inferredRole = "web";
+    if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+      inferredRole = "mobile";
+    }
+
+    function log(msg) {
+      const li = document.createElement('li');
+      li.innerText = msg;
+      document.getElementById('messages').appendChild(li);
+    }
+
+    async function createRoom() {
+      const res = await fetch("/create-room", { method: "POST" });
+      const data = await res.json();
+      joinRoom(data.roomId);
+    }
+
+    async function manualJoin() {
+      const roomId = document.getElementById("roomIdInput").value.trim();
+      if (!roomId) {
+        alert("Please enter a Room ID");
+        return;
+      }
+
+      const res = await fetch("/join-room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId })
+      });
+
+      if (res.ok) {
+        joinRoom(roomId);
+      } else {
+        alert("Room not found.");
+      }
+    }
+
+    function joinRoom(roomId) {
+      document.getElementById("roomInfo").innerText = `🔗 Joined Room: ${roomId} as ${inferredRole}`;
+      socket.emit("join-room", { roomId, userId, role: inferredRole });
+      generateQr(roomId);
+    }
+
+    function generateQr(roomId) {
+      if (inferredRole !== "web") return;
+
+      const sessionInfo = {
+        roomId,
+        userId,
+        role: "mobile"
+      };
+      const encoded = encodeURIComponent(JSON.stringify(sessionInfo));
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encoded}&size=200x200`;
+
+      const img = document.createElement('img');
+      img.src = qrUrl;
+      img.alt = "Scan to join as fallback";
+      img.style.border = "1px solid #ccc";
+      img.style.marginTop = "10px";
+
+      const div = document.getElementById("qrDisplay");
+      div.innerHTML = "<p>📱 Scan to add backup mobile device:</p>";
+      div.appendChild(img);
+    }
+
+    socket.on("user-joined", (id) => {
+      log(`👥 User joined: ${id}`);
+    });
+
+    // Mobile sees prompt when web disconnects
+    socket.on("web-disconnected", ({ userId: disconnectedId, roomId }) => {
+      if (inferredRole !== "mobile") return;
+      log(`⚠️ Web client disconnected: ${disconnectedId}`);
+
+      const btn = document.createElement("button");
+      btn.innerText = "📱 Continue on Phone";
+      btn.style.marginTop = "10px";
+      btn.onclick = () => {
+        socket.emit("join-room", { roomId, userId, role: "mobile" });
+        socket.emit("mobile-takeover", { roomId, userId });
+        log("✅ Session resumed on phone.");
+        btn.remove();
+      };
+
+      document.body.appendChild(btn);
+    });
+
+    socket.on("no-backup-found", () => {
+      alert("⚠️ No backup device found. Please connect a second device.");
+    });
+  </script>
+</body>
+</html>
