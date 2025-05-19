@@ -17,7 +17,9 @@
   <ul id="messages"></ul>
 
   <script>
-    const socket = io("https://eef7-2401-4900-8844-e630-7017-ba0d-19d4-79c6.ngrok-free.app"); // Change to your server/ngrok URL when deployed
+    const API_BASE = "https://eef7-2401-4900-8844-e630-7017-ba0d-19d4-79c6.ngrok-free.app";
+    const socket = io(API_BASE);
+
     let userId = localStorage.getItem('userId');
     if (!userId) {
       userId = crypto.randomUUID();
@@ -37,7 +39,7 @@
     }
 
     async function createRoom() {
-      const res = await fetch("/create-room", { method: "POST" });
+      const res = await fetch(`${API_BASE}/create-room`, { method: "POST" });
       const data = await res.json();
       joinRoom(data.roomId);
     }
@@ -49,7 +51,7 @@
         return;
       }
 
-      const res = await fetch("/join-room", {
+      const res = await fetch(`${API_BASE}/join-room`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId })
@@ -94,7 +96,6 @@
       log(`👥 User joined: ${id}`);
     });
 
-    // Mobile sees prompt when web disconnects
     socket.on("web-disconnected", ({ userId: disconnectedId, roomId }) => {
       if (inferredRole !== "mobile") return;
       log(`⚠️ Web client disconnected: ${disconnectedId}`);
