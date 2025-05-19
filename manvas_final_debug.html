@@ -1,0 +1,197 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manvas Live (Final Edition)</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js">
+    function manualPing() {
+  if (inferredRole !== "web") {
+    log("❌ Cannot ping from mobile role.");
+    return;
+  }
+      if (!currentRoomId) return log("❌ No room to ping.");
+      log("📡 Manual ping sent to mobile");
+      socket.emit("manual-ping", { roomId: currentRoomId, userId });
+    }
+    
+socket.on("manual-ping", ({ roomId, userId }) => {
+  log(`📥 Ping received from web: ${userId}`);
+  socket.emit("manual-pong", { roomId, userId });
+});
+
+socket.on("manual-pong", ({ roomId, userId }) => {
+  log(`📲 Pong received from: ${userId}`);
+});
+
+socket.on("manual-ping", ({ roomId, userId }) => {
+  log(`📥 Ping received from web: ${userId}`);
+  socket.emit("manual-pong", { roomId, userId });
+});
+
+socket.on("manual-pong", ({ roomId, userId }) => {
+  log(`📲 Pong received from: ${userId}`);
+});
+</script>
+
+
+    
+</head>
+<body>
+  <h2>Manvas Room (Auto-Join + Dynamic API + Logs)</h2>
+  <div>
+    <button onclick="createRoom()">Create New Room</button>
+    <input type="text" id="roomIdInput" placeholder="Or Enter Room ID" />
+    <button onclick="manualJoin()">Join</button>
+    <button onclick="manualPing()">📡 Manual Ping to Mobile</button>
+  </div>
+
+  <div id="roomInfo" style="margin-top: 10px; font-weight: bold;"></div>
+  <div id="userInfo" style="margin-top: 5px; font-size: 12px; color: gray;"></div>
+  <div id="qrDisplay" style="margin-top: 10px;"></div>
+  <div id="logArea" style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8f8f8; padding: 8px; font-size: 12px; max-height: 160px; overflow-y: auto; border-top: 1px solid #aaa;"></div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const API_BASE = params.get("api") || "https://eef7-2401-4900-8844-e630-7017-ba0d-19d4-79c6.ngrok-free.app";
+
+    const socket = io(API_BASE, {
+      path: "/socket.io",
+      transports: ["websocket"]
+    });
+
+    let userId = params.get("userId") || localStorage.getItem("userId");
+    if (!userId) userId = crypto.randomUUID();
+    localStorage.setItem("userId", userId);
+
+    let inferredRole = params.get("role") || "web";
+    if (!params.get("role") && /Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+      inferredRole = "mobile";
+    }
+
+    document.getElementById("userInfo").innerText = `User ID: ${userId}`;
+
+    socket.on("connect", () => log("✅ Connected to socket. ID: " + socket.id));
+    socket.on("connect_error", err => log("❌ Connect error: " + err.message));
+    socket.on("manual-ping", ({ roomId, userId }) => {
+      log(`📥 Manual ping received. Replying pong. [Room: ${roomId}, From: ${userId}]`);
+      socket.emit("manual-pong", { roomId, userId });
+    });
+
+    let currentRoomId = null;
+
+    async function createRoom() {
+      log("Creating room...");
+      const res = await fetch(`${API_BASE}/create-room`, { method: "POST" });
+      const data = await res.json();
+      log("Room created: " + data.roomId);
+      joinRoom(data.roomId);
+    }
+
+    async function manualJoin() {
+      const roomId = document.getElementById("roomIdInput").value.trim();
+      if (!roomId) return alert("Enter Room ID");
+      const res = await fetch(`${API_BASE}/join-room`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId })
+      });
+      if (res.ok) {
+        log("Join-room success");
+        joinRoom(roomId);
+      } else alert("Room not found");
+    }
+
+    function joinRoom(roomId) {
+      if (!roomId) {
+        log("❌ joinRoom aborted: missing roomId");
+        return;
+      }
+      currentRoomId = roomId;
+      document.getElementById("roomIdInput").value = roomId;
+      document.getElementById("roomInfo").innerText = `🔗 Joined Room: ${roomId} as ${inferredRole}`;
+      log(`🚀 Sending socket.emit('join-room') with Room: ${roomId}, User: ${userId}, Role: ${inferredRole}`);
+      socket.emit("join-room", { roomId, userId, role: inferredRole });
+      generateQr(roomId);
+    }
+
+    function generateQr(roomId) {
+      if (inferredRole !== "web") return;
+
+      const sessionInfo = new URLSearchParams({
+        roomId,
+        userId,
+        role: "mobile",
+        api: API_BASE
+      });
+      const currentFile = location.pathname.split("/").pop();
+      const url = `https://gauravsaxena889.github.io/Blisstech/${currentFile}?${sessionInfo.toString()}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=200x200`;
+
+      const img = document.createElement("img");
+      img.src = qrUrl;
+      img.alt = "Scan to join";
+      img.style.border = "1px solid #ccc";
+      img.style.marginTop = "10px";
+
+      const div = document.getElementById("qrDisplay");
+      div.innerHTML = "<p>📱 Scan this QR to join from fallback device:</p>";
+      div.appendChild(img);
+
+      log("✅ QR generated using dynamic path: " + url);
+    }
+
+    // Auto-join on load
+    window.onload = () => {
+      const roomId = params.get("roomId");
+      const role = params.get("role");
+      if (roomId && role === "mobile") {
+        inferredRole = "mobile";
+        log(`[Auto-Join] Joining room ${roomId} as mobile...`);
+        joinRoom(roomId);
+      } else {
+        log("🌐 No auto-join conditions met.");
+      }
+    };
+
+    function log(msg) {
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement("div");
+      div.textContent = `[${time}] ${msg}`;
+      const area = document.getElementById("logArea");
+      area.appendChild(div);
+      area.scrollTop = area.scrollHeight;
+    }
+  
+    function manualPing() {
+  if (inferredRole !== "web") {
+    log("❌ Cannot ping from mobile role.");
+    return;
+  }
+      if (!currentRoomId) return log("❌ No room to ping.");
+      log("📡 Manual ping sent to mobile");
+      socket.emit("manual-ping", { roomId: currentRoomId, userId });
+    }
+    
+socket.on("manual-ping", ({ roomId, userId }) => {
+  log(`📥 Ping received from web: ${userId}`);
+  socket.emit("manual-pong", { roomId, userId });
+});
+
+socket.on("manual-pong", ({ roomId, userId }) => {
+  log(`📲 Pong received from: ${userId}`);
+});
+
+socket.on("manual-ping", ({ roomId, userId }) => {
+  log(`📥 Ping received from web: ${userId}`);
+  socket.emit("manual-pong", { roomId, userId });
+});
+
+socket.on("manual-pong", ({ roomId, userId }) => {
+  log(`📲 Pong received from: ${userId}`);
+});
+</script>
+
+
+    
+</body>
+</html>
