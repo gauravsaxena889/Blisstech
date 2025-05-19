@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manvas Test Room</title>
+  <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+</head>
+<body>
+  <h2>Manvas Room Test</h2>
+  <input type="text" id="roomId" placeholder="Enter Room ID">
+  <button onclick="joinRoom()">Join Room</button>
+  <ul id="messages"></ul>
+
+ <script>
+  const socket = io("https://d1ce-2401-4900-8844-e630-6cd0-217f-37c3-a1ac.ngrok-free.app");
+
+  async function joinRoom() {
+    const roomId = document.getElementById('roomId').value;
+
+    // Step 1: Verify with backend before joining
+    try {
+      const res = await fetch('/join-room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        localStorage.setItem('lastRoomId', roomId);
+        socket.emit("join-room", roomId);
+        log(`✅ Joined room ${roomId}`);
+      } else {
+        log(`❌ Room not found: ${roomId}`);
+      }
+    } catch (err) {
+      log(`⚠️ Error: ${err.message}`);
+    }
+  }
+
+  // Listener
+  socket.on("user-joined", id => {
+    log(`👤 User joined: ${id}`);
+  });
+
+  socket.on("room-error", msg => {
+    log(`❌ Error: ${msg}`);
+  });
+
+  function log(msg) {
+    const item = document.createElement('li');
+    item.innerText = msg;
+    document.getElementById('messages').appendChild(item);
+  }
+
+  // Optional: Auto-reconnect to last room
+  window.onload = () => {
+    const lastRoomId = localStorage.getItem('lastRoomId');
+    if (lastRoomId) {
+      document.getElementById('roomId').value = lastRoomId;
+      joinRoom();
+    }
+  };
+</script>
+
+</body>
+</html>
