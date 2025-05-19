@@ -17,8 +17,8 @@
   <ul id="messages"></ul>
 
   <script>
-    const API_BASE = "https://eef7-2401-4900-8844-e630-7017-ba0d-19d4-79c6.ngrok-free.app";
-    const socket = io(API_BASE);
+    const socket = io("https://eef7-2401-4900-8844-e630-7017-ba0d-19d4-79c6.ngrok-free.app");
+const API_BASE = "https://eef7-2401-4900-8844-e630-7017-ba0d-19d4-79c6.ngrok-free.app"
 
     let userId = localStorage.getItem('userId');
     if (!userId) {
@@ -39,31 +39,30 @@
     }
 
     async function createRoom() {
-      const res = await fetch(`${API_BASE}/create-room`, { method: "POST" });
-      const data = await res.json();
-      joinRoom(data.roomId);
-    }
+  const res = await fetch(`${API_BASE}/create-room`, { method: "POST" });
+  const data = await res.json();
+  joinRoom(data.roomId);
+}
 
-    async function manualJoin() {
-      const roomId = document.getElementById("roomIdInput").value.trim();
-      if (!roomId) {
-        alert("Please enter a Room ID");
-        return;
-      }
+async function manualJoin() {
+  const roomId = document.getElementById("roomIdInput").value.trim();
+  if (!roomId) {
+    alert("Please enter a Room ID");
+    return;
+  }
 
-      const res = await fetch(`${API_BASE}/join-room`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roomId })
-      });
+  const res = await fetch(`${API_BASE}/join-room`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roomId })
+  });
 
-      if (res.ok) {
-        joinRoom(roomId);
-      } else {
-        alert("Room not found.");
-      }
-    }
-
+  if (res.ok) {
+    joinRoom(roomId);
+  } else {
+    alert("Room not found.");
+  }
+}
     function joinRoom(roomId) {
       document.getElementById("roomInfo").innerText = `🔗 Joined Room: ${roomId} as ${inferredRole}`;
       socket.emit("join-room", { roomId, userId, role: inferredRole });
