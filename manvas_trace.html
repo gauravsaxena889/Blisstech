@@ -1,0 +1,122 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manvas Trace Log</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+  <h2>Manvas Fallback Trace (Auto Join Debug)</h2>
+  <div>
+    <button onclick="createRoom()">Create New Room</button>
+    <input type="text" id="roomIdInput" placeholder="Or Enter Room ID" />
+    <button onclick="manualJoin()">Join</button>
+  </div>
+
+  <div id="roomInfo" style="margin-top: 10px; font-weight: bold;"></div>
+  <div id="userInfo" style="margin-top: 5px; font-size: 12px; color: gray;"></div>
+  <div id="logArea" style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8f8f8; padding: 8px; font-size: 12px; max-height: 160px; overflow-y: auto; border-top: 1px solid #aaa;"></div>
+
+  <script>
+    const API_BASE = "https://eef7-2401-4900-8844-e630-7017-ba0d-19d4-79c6.ngrok-free.app";
+    const socket = io(API_BASE, { transports: ["websocket"], path: "/socket.io" });
+
+    const params = new URLSearchParams(window.location.search);
+    let userId = params.get("userId") || localStorage.getItem("userId");
+    if (!userId) {
+      userId = crypto.randomUUID();
+      log("⚠️ userId not found in URL or localStorage. Generated new: " + userId);
+    }
+    localStorage.setItem("userId", userId);
+
+    let inferredRole = params.get("role") || "web";
+    if (!params.get("role")) {
+      const ua = navigator.userAgent;
+      if (/Mobi|Android|iPhone/i.test(ua)) inferredRole = "mobile";
+    }
+
+    document.getElementById("userInfo").innerText = `User ID: ${userId}`;
+    log(`[Init] Role: ${inferredRole}, User ID: ${userId}`);
+
+    socket.on("connect", () => {
+      log("✅ Connected to socket. Socket ID: " + socket.id);
+    });
+
+    socket.on("connect_error", err => {
+      log("❌ Connect error: " + err.message);
+    });
+
+    socket.on("manual-ping", ({ roomId, userId }) => {
+      log(`📥 Manual ping received — replying pong. [Room: ${roomId}, From: ${userId}]`);
+      socket.emit("manual-pong", { roomId, userId });
+    });
+
+    let currentRoomId = null;
+
+    async function createRoom() {
+      log("🛠 Calling /create-room...");
+      const res = await fetch(`${API_BASE}/create-room`, { method: "POST" });
+      const data = await res.json();
+      log(`🆕 Room created: ${data.roomId}`);
+      joinRoom(data.roomId);
+    }
+
+    async function manualJoin() {
+      const roomId = document.getElementById("roomIdInput").value.trim();
+      if (!roomId) {
+        log("⚠️ Manual Join: No Room ID entered.");
+        return;
+      }
+      log(`📤 POST /join-room for ${roomId}`);
+      const res = await fetch(`${API_BASE}/join-room`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId })
+      });
+      if (res.ok) {
+        log("✅ Manual join-room success. Proceeding to joinRoom().");
+        joinRoom(roomId);
+      } else {
+        log("❌ Manual join-room failed. Room not found.");
+      }
+    }
+
+    function joinRoom(roomId) {
+      if (!roomId) {
+        log("❌ joinRoom aborted: roomId is missing.");
+        return;
+      }
+      currentRoomId = roomId;
+      document.getElementById("roomIdInput").value = roomId;
+      document.getElementById("roomInfo").innerText = `🔗 Joined Room: ${roomId} as ${inferredRole}`;
+      log(`🚀 Sending socket.emit('join-room') with Room: ${roomId}, User: ${userId}, Role: ${inferredRole}`);
+      socket.emit("join-room", { roomId, userId, role: inferredRole });
+    }
+
+    // Deep trace auto-join
+    window.onload = () => {
+      const roomId = params.get("roomId");
+      const role = params.get("role");
+      log("🌐 onload triggered. Checking query params...");
+      if (roomId) log("✅ roomId in query: " + roomId); else log("❌ No roomId in query");
+      if (role) log("✅ role in query: " + role); else log("❌ No role in query");
+
+      if (roomId && role === "mobile") {
+        inferredRole = "mobile";
+        log(`[Auto-Join] Starting auto-join to room ${roomId} as mobile...`);
+        joinRoom(roomId);
+      } else {
+        log("🚫 Auto-join skipped. Conditions not met.");
+      }
+    };
+
+    function log(msg) {
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement("div");
+      div.textContent = `[${time}] ${msg}`;
+      document.getElementById("logArea").appendChild(div);
+      document.getElementById("logArea").scrollTop = document.getElementById("logArea").scrollHeight;
+    }
+  </script>
+</body>
+</html>
