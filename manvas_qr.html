@@ -1,0 +1,112 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Manvas QR Generator (Dynamic Filename)</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+  <h2>Manvas Live Room (Flexible QR Path)</h2>
+  <div>
+    <button onclick="createRoom()">Create New Room</button>
+    <input type="text" id="roomIdInput" placeholder="Or Enter Room ID" />
+    <button onclick="manualJoin()">Join</button>
+  </div>
+
+  <div id="roomInfo" style="margin-top: 10px; font-weight: bold;"></div>
+  <div id="userInfo" style="margin-top: 5px; font-size: 12px; color: gray;"></div>
+  <div id="qrDisplay" style="margin-top: 10px;"></div>
+  <div id="logArea" style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8f8f8; padding: 8px; font-size: 12px; max-height: 160px; overflow-y: auto; border-top: 1px solid #aaa;"></div>
+
+  <script>
+    const API_BASE = "https://eef7-2401-4900-8844-e630-7017-ba0d-19d4-79c6.ngrok-free.app";
+    const socket = io(API_BASE);
+
+    const params = new URLSearchParams(window.location.search);
+    let userId = params.get("userId") || localStorage.getItem("userId");
+    if (!userId) userId = crypto.randomUUID();
+    localStorage.setItem("userId", userId);
+
+    let inferredRole = params.get("role") || "web";
+    if (!params.get("role")) {
+      const ua = navigator.userAgent;
+      if (/Mobi|Android|iPhone/i.test(ua)) inferredRole = "mobile";
+    }
+
+    document.getElementById("userInfo").innerText = `User ID: ${userId}`;
+
+    socket.on("connect", () => log("✅ Connected to socket. ID: " + socket.id));
+    socket.on("manual-ping", ({ roomId, userId }) => {
+      log(`📥 Manual ping received. Replying pong. [Room: ${roomId}, From: ${userId}]`);
+      socket.emit("manual-pong", { roomId, userId });
+    });
+
+    let currentRoomId = null;
+
+    async function createRoom() {
+      log("Creating room...");
+      const res = await fetch(`${API_BASE}/create-room`, { method: "POST" });
+      const data = await res.json();
+      log("Room created: " + data.roomId);
+      joinRoom(data.roomId);
+    }
+
+    async function manualJoin() {
+      const roomId = document.getElementById("roomIdInput").value.trim();
+      if (!roomId) return alert("Enter Room ID");
+      const res = await fetch(`${API_BASE}/join-room`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId })
+      });
+      if (res.ok) {
+        log("Join-room success");
+        joinRoom(roomId);
+      } else alert("Room not found");
+    }
+
+    function joinRoom(roomId) {
+      currentRoomId = roomId;
+      document.getElementById("roomIdInput").value = roomId;
+      document.getElementById("roomInfo").innerText = `🔗 Joined Room: ${roomId} as ${inferredRole}`;
+      socket.emit("join-room", { roomId, userId, role: inferredRole });
+      generateQr(roomId);
+    }
+
+    function generateQr(roomId) {
+      if (inferredRole !== "web") return;
+
+      const sessionInfo = new URLSearchParams({
+        roomId,
+        userId,
+        role: "mobile"
+      });
+
+      const currentFile = location.pathname.split("/").pop(); // dynamic file name
+      const url = `https://gauravsaxena889.github.io/Blisstech/${currentFile}?${sessionInfo.toString()}`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=200x200`;
+
+      const img = document.createElement("img");
+      img.src = qrUrl;
+      img.alt = "Scan to join";
+      img.style.border = "1px solid #ccc";
+      img.style.marginTop = "10px";
+
+      const div = document.getElementById("qrDisplay");
+      div.innerHTML = "<p>📱 Scan this QR to join from fallback device:</p>";
+      div.appendChild(img);
+
+      log("✅ QR generated using dynamic path: " + url);
+    }
+
+    function log(msg) {
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement("div");
+      div.textContent = `[${time}] ${msg}`;
+      const area = document.getElementById("logArea");
+      area.appendChild(div);
+      area.scrollTop = area.scrollHeight;
+    }
+  </script>
+</body>
+</html>
