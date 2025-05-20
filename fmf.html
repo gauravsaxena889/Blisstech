@@ -117,17 +117,24 @@
       });
     }
 
-    function createSpace() {
-      fetch(backend + "/create-space", { method: 'POST' })
-        .then(res => res.json())
-        .then(data => {
-          document.getElementById("spaceId").value = data.spaceId;
-          renderQR(data.spaceId);
-          socket.emit("join-space", { spaceId: data.spaceId, userId, role });
-          FallbackUI.init(socket, role);
-        })
-        .catch(err => alert("❌ Failed to create space"));
-    }
+ function createSpace() {
+  fetch(backend + "/create-space", { method: 'POST' })
+    .then(res => {
+      if (!res.ok) throw new Error("Server error");
+      return res.json();
+    })
+    .then(data => {
+      document.getElementById("spaceId").value = data.spaceId;
+      renderQR(data.spaceId);
+      socket.emit("join-space", { spaceId: data.spaceId, userId, role });
+      FallbackUI.init(socket, role);
+    })
+    .catch(err => {
+      console.error("❌ Create space failed:", err);
+      alert("❌ Failed to create space");
+    });
+}
+
 
     function joinSpace() {
       const spaceId = document.getElementById("spaceId").value.trim();
