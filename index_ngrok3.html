@@ -124,22 +124,30 @@
         .catch(err => alert("❌ Failed to create space"));
     }
 
-    function joinSpace() {
-      const spaceId = document.getElementById("spaceId").value.trim();
-      if (!spaceId) return alert("Enter a valid space ID");
+  function joinSpace() {
+  const spaceId = document.getElementById("spaceId").value.trim();
+  if (!spaceId) {
+    alert("Enter a valid space ID");
+    return;
+  }
 
-      fetch(backend + "/join-space", {
-        method: 'POST',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spaceId })
-      })
-      .then(res => {
-        if (!res.ok) throw new Error("Space not found");
-        renderQR(spaceId);
-        socket.emit("join-space", { spaceId, userId, role });
-      })
-      .catch(err => alert("❌ " + err.message));
-    }
+  fetch(backend + "/join-space", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ spaceId })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Space not found");
+    console.log(`🔗 Joined space: ${spaceId} as ${role}`);
+    renderQR(spaceId); // optional for re-pairing
+    socket.emit("join-space", { spaceId, userId, role });
+    FallbackUI.init(socket, role); // activate UI feedback
+  })
+  .catch(err => {
+    alert("❌ " + err.message);
+    console.error("❌ Join failed:", err);
+  });
+}
 
     window.onload = () => {
       if (joinedSpace) {
