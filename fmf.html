@@ -96,13 +96,15 @@
   <script>
     const backend = "https://2b00-2401-4900-8844-4fd4-5cb3-3c48-5909-2973.ngrok-free.app"; // ✅ Change if needed
     const socket = io(backend, {
-      transports: ['websocket'],
-      secure: true,
-      reconnection: true,
-      reconnectionAttempts: 3,
-      reconnectionDelay: 1000,
-      timeout: 3000
-    });
+  transports: ['websocket'],
+  secure: true,
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 5000,
+  reconnectionDelayMax: 30000,
+  randomizationFactor: 0.5,
+  timeout: 3000
+});
 
     let alreadyJoined = false;
 
