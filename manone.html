@@ -1,132 +1,188 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Manvas Final – All-in-One</title>
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <meta charset="UTF-8" />
+  <title>Manvas • Smart Fallback</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      height: 100vh;
+    }
+    .left, .right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+    }
+    .left {
+      background: #f0f4ff;
+      border-right: 1px solid #ddd;
+    }
+    .right {
+      background: #ffffff;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    canvas {
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    .form-group {
+      margin: 15px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    label {
+      font-size: 14px;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+    input {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #aaa;
+      width: 240px;
+      font-size: 14px;
+    }
+    button {
+      padding: 10px 20px;
+      margin-top: 15px;
+      border: none;
+      border-radius: 6px;
+      background-color: #6c5ce7;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #4b32b6;
+    }
+    pre#debug {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 120px;
+      background: #000;
+      color: #0f0;
+      font-size: 13px;
+      overflow-y: scroll;
+      margin: 0;
+      padding: 8px;
+      font-family: monospace;
+    }
+  </style>
 </head>
 <body>
-  <h2>Manvas Final Room (Auto-Join + QR + Logs)</h2>
-  <div>
-    <button onclick="createRoom()">Create New Room</button>
-    <input type="text" id="roomIdInput" placeholder="Or Enter Room ID" />
-    <button onclick="manualJoin()">Join</button>
+
+  <div class="left">
+    <h1>📱 Scan to Join</h1>
+    <canvas id="qrCanvas"></canvas>
   </div>
 
-  <div id="roomInfo" style="margin-top: 10px; font-weight: bold;"></div>
-  <div id="userInfo" style="margin-top: 5px; font-size: 12px; color: gray;"></div>
-  <div id="qrDisplay" style="margin-top: 10px;"></div>
-  <div id="logArea" style="position: fixed; bottom: 0; left: 0; right: 0; background: #f8f8f8; padding: 8px; font-size: 12px; max-height: 160px; overflow-y: auto; border-top: 1px solid #aaa;"></div>
+  <div class="right">
+    <h1>🔧 Join or Create Space</h1>
+    <div class="form-group">
+      <label for="spaceId">Space ID</label>
+      <input type="text" id="spaceId" placeholder="e.g. abc-123" />
+    </div>
+    <div class="form-group">
+      <button onclick="createSpace()">➕ Create Space</button>
+      <button onclick="joinSpace()">🔗 Join Space</button>
+    </div>
+  </div>
+
+  <pre id="debug">[log started]</pre>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
   <script>
-    const API_BASE = "https://eef7-2401-4900-8844-e630-7017-ba0d-19d4-79c6.ngrok-free.app";
-    const socket = io(API_BASE);
+    const backend = "https://09af-2401-4900-8844-4fd4-514c-4325-bfd5-34ba.ngrok-free.app";
+    const socket = io(backend);
+    const userId = crypto.randomUUID();
 
-    const params = new URLSearchParams(window.location.search);
-    let userId = params.get("userId") || localStorage.getItem("userId");
-    if (!userId) userId = crypto.randomUUID();
-    localStorage.setItem("userId", userId);
-
-    let inferredRole = params.get("role") || "web";
-    if (!params.get("role")) {
-      const ua = navigator.userAgent;
-      if (/Mobi|Android|iPhone/i.test(ua)) inferredRole = "mobile";
-    }
-
-    document.getElementById("userInfo").innerText = `User ID: ${userId}`;
-
-    socket.on("connect", () => log("✅ Connected to socket. ID: " + socket.id));
-    socket.on("connect_error", err => log("❌ Connect error: " + err.message));
-    socket.on("manual-ping", ({ roomId, userId }) => {
-      log(`📥 Manual ping received. Replying pong. [Room: ${roomId}, From: ${userId}]`);
-      socket.emit("manual-pong", { roomId, userId });
-    });
-
-    let currentRoomId = null;
-
-    async function createRoom() {
-      log("Creating room...");
-      const res = await fetch(`${API_BASE}/create-room`, { method: "POST" });
-      const data = await res.json();
-      log("Room created: " + data.roomId);
-      joinRoom(data.roomId);
-    }
-
-    async function manualJoin() {
-      const roomId = document.getElementById("roomIdInput").value.trim();
-      if (!roomId) return alert("Enter Room ID");
-      const res = await fetch(`${API_BASE}/join-room`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roomId })
-      });
-      if (res.ok) {
-        log("Join-room success");
-        joinRoom(roomId);
-      } else alert("Room not found");
-    }
-
-    function joinRoom(roomId) {
-      if (!roomId) {
-        log("❌ joinRoom aborted: missing roomId");
-        return;
-      }
-      currentRoomId = roomId;
-      document.getElementById("roomIdInput").value = roomId;
-      document.getElementById("roomInfo").innerText = `🔗 Joined Room: ${roomId} as ${inferredRole}`;
-      log(`🚀 Sending socket.emit('join-room') with Room: ${roomId}, User: ${userId}, Role: ${inferredRole}`);
-      socket.emit("join-room", { roomId, userId, role: inferredRole });
-      generateQr(roomId);
-    }
-
-    function generateQr(roomId) {
-      if (inferredRole !== "web") return;
-
-      const sessionInfo = new URLSearchParams({
-        roomId,
-        userId,
-        role: "mobile"
-      });
-      const currentFile = location.pathname.split("/").pop();
-      const url = `https://gauravsaxena889.github.io/Blisstech/${currentFile}?${sessionInfo.toString()}`;
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=200x200`;
-
-      const img = document.createElement("img");
-      img.src = qrUrl;
-      img.alt = "Scan to join";
-      img.style.border = "1px solid #ccc";
-      img.style.marginTop = "10px";
-
-      const div = document.getElementById("qrDisplay");
-      div.innerHTML = "<p>📱 Scan this QR to join from fallback device:</p>";
-      div.appendChild(img);
-
-      log("✅ QR generated using dynamic path: " + url);
-    }
-
-    // Auto-join on mobile load
-    window.onload = () => {
-      const roomId = params.get("roomId");
-      const role = params.get("role");
-      log("🌐 onload triggered. Checking query params...");
-      if (roomId) log("✅ roomId in query: " + roomId); else log("❌ No roomId in query");
-      if (role) log("✅ role in query: " + role); else log("❌ No role in query");
-
-      if (roomId && role === "mobile") {
-        inferredRole = "mobile";
-        log(`[Auto-Join] Joining room ${roomId} as mobile...`);
-        joinRoom(roomId);
-      }
-    };
+    const params = new URLSearchParams(location.search);
+    const role = params.get("role") || "web";
 
     function log(msg) {
-      const time = new Date().toLocaleTimeString();
-      const div = document.createElement("div");
-      div.textContent = `[${time}] ${msg}`;
-      const area = document.getElementById("logArea");
-      area.appendChild(div);
-      area.scrollTop = area.scrollHeight;
+      const el = document.getElementById("debug");
+      const now = new Date().toLocaleTimeString();
+      el.innerText += `[${now}] ${msg}\n`;
+      el.scrollTop = el.scrollHeight;
     }
+
+    function renderQR(spaceId) {
+      const url = `${window.location.origin}${window.location.pathname}?spaceId=${spaceId}&userId=${userId}&role=mobile`;
+      QRCode.toCanvas(document.getElementById("qrCanvas"), url, (error) => {
+        if (error) {
+          console.error("❌ QR render failed:", error);
+          log("❌ QR render failed");
+        } else {
+          log(`✅ QR generated for mobile: ${url}`);
+        }
+      });
+    }
+
+    function createSpace() {
+      fetch(`${backend}/create-space`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          const spaceId = data.spaceId;
+          document.getElementById("spaceId").value = spaceId;
+          renderQR(spaceId);
+          socket.emit("join-space", { spaceId, userId, role });
+          log(`✅ Created and joined space as ${role}`);
+        })
+        .catch(err => alert("❌ Failed to create space"));
+    }
+
+    function joinSpace() {
+      const spaceId = document.getElementById("spaceId").value.trim();
+      if (!spaceId) return alert("Enter a valid space ID");
+
+      fetch(`${backend}/join-space`, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spaceId })
+      })
+        .then(res => {
+          if (!res.ok) throw new Error("Space not found");
+          renderQR(spaceId);
+          socket.emit("join-space", { spaceId, userId, role });
+          log(`🔗 Joined space as ${role}`);
+        })
+        .catch(err => alert("❌ " + err.message));
+    }
+
+    // Handle fallback events
+    socket.on("mobile-joined", () => log("📱 Mobile joined this space"));
+    socket.on("web-joined", () => log("🖥️ Web joined this space"));
+    socket.on("mobile-disconnected", () => log("⚠️ Mobile disconnected"));
+    socket.on("web-disconnected", () => log("⚠️ Web disconnected — fallback to mobile"));
+
+    window.onload = () => {
+      const spaceId = params.get("spaceId");
+      if (spaceId) {
+        document.getElementById("spaceId").value = spaceId;
+        socket.emit("join-space", { spaceId, userId, role });
+        log(`🔄 Auto-joined ${spaceId} as ${role}`);
+      } else {
+        renderQR("pending");
+      }
+    };
   </script>
+
 </body>
 </html>
