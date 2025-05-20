@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -95,7 +96,10 @@
 
   <script>
     const backend = "https://09af-2401-4900-8844-4fd4-514c-4325-bfd5-34ba.ngrok-free.app";
-    const socket = io(backend);
+    const socket = io(backend, {
+      transports: ['websocket'],
+      secure: true
+    });
     const userId = crypto.randomUUID();
     const params = new URLSearchParams(location.search);
     const role = params.get("role") || "web";
@@ -141,7 +145,7 @@
       if (joinedSpace) {
         document.getElementById("spaceId").value = joinedSpace;
         socket.emit("join-space", { spaceId: joinedSpace, userId, role });
-        renderQR(joinedSpace); // Also show QR if reloaded on mobile
+        renderQR(joinedSpace);
       } else {
         renderQR("pending");
       }
