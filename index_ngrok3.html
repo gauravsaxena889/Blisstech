@@ -89,20 +89,19 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script src="./js/fallback-ui.js"></script> <!-- or remove if not using fallback display -->
+<script src="./js/fallback-ui.js"></script>
 
+<script>
   const backend = "https://09af-2401-4900-8844-4fd4-514c-4325-bfd5-34ba.ngrok-free.app";
   const socket = io(backend);
   const userId = crypto.randomUUID();
 
-  // ✅ Dynamically detect role
   const params = new URLSearchParams(location.search);
   const role = params.get("role") || "web";
 
   function renderQR(spaceId) {
-    // ✅ Always send mobile in QR (scanned device acts as mobile)
     const url = `${backend}/space.html?spaceId=${spaceId}&userId=${userId}&role=mobile`;
     QRCode.toCanvas(document.getElementById("qrCanvas"), url, function (error) {
       if (error) {
@@ -142,7 +141,7 @@
   }
 
   window.onload = () => {
-    renderQR("pending"); // Initial dummy QR
+    renderQR("pending");
     FallbackUI.init(socket, role);
   };
 </script>
