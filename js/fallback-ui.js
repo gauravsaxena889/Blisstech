@@ -1,25 +1,28 @@
+// fallback-ui.js — Final Fix with accurate role detection
+
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
   statusEl = document.createElement("div");
   statusEl.id = "fallbackStatus";
-  statusEl.style.position = "fixed";
-  statusEl.style.bottom = "20px";
-  statusEl.style.right = "20px";
-  statusEl.style.padding = "12px 20px";
-  statusEl.style.borderRadius = "8px";
-  statusEl.style.fontFamily = "Inter, sans-serif";
-  statusEl.style.fontSize = "14px";
-  statusEl.style.color = "#fff";
-  statusEl.style.backgroundColor = "#6c5ce7";
-  statusEl.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
-  statusEl.style.zIndex = 9999;
+  Object.assign(statusEl.style, {
+    position: "fixed",
+    bottom: "20px",
+    right: "20px",
+    padding: "12px 20px",
+    borderRadius: "8px",
+    fontFamily: "Inter, sans-serif",
+    fontSize: "14px",
+    color: "#fff",
+    backgroundColor: "#6c5ce7",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+    zIndex: 9999
+  });
   statusEl.innerText = "🔄 Connecting...";
   document.body.appendChild(statusEl);
 }
 
 let connectedToWeb = false;
 let connectedToMobile = false;
-let reconnectCooldown = false;
 
 function updateStatusUI() {
   if (connectedToWeb && connectedToMobile) {
@@ -47,38 +50,33 @@ function simulateFallback(socket, currentRole) {
   ].forEach(event => socket.off(event));
 
   socket.on("mobile-joined", () => {
+    console.log("📲 Mobile joined");
     connectedToMobile = true;
     updateStatusUI();
   });
 
   socket.on("mobile-disconnected", () => {
+    console.log("📴 Mobile disconnected");
     connectedToMobile = false;
     updateStatusUI();
   });
 
   socket.on("web-joined", () => {
+    console.log("🖥️ Web joined");
     connectedToWeb = true;
     updateStatusUI();
   });
 
   socket.on("web-disconnected", () => {
+    console.log("🛑 Web disconnected");
     connectedToWeb = false;
     updateStatusUI();
   });
 
   socket.on("presence-update", ({ users }) => {
-    const webPresent = users.some(u => u.role === "web");
-    const mobilePresent = users.some(u => u.role === "mobile");
-
-    connectedToWeb = webPresent;
-    connectedToMobile = mobilePresent;
-
-    console.log("📡 presence-update →", {
-      connectedToWeb,
-      connectedToMobile,
-      from: users
-    });
-
+    console.log("📡 presence-update →", users);
+    connectedToWeb = users.some(u => u.role === "web");
+    connectedToMobile = users.some(u => u.role === "mobile");
     updateStatusUI();
   });
 
@@ -87,12 +85,15 @@ function simulateFallback(socket, currentRole) {
 
 window.FallbackUI = {
   init(socket, role) {
+    connectedToWeb = false;
+    connectedToMobile = false;
+
     simulateFallback(socket, role);
 
     socket.off("disconnect").on("disconnect", () => {
       console.warn("⚠️ Socket disconnected");
-      if (role === "web") connectedToWeb = false;
-      if (role === "mobile") connectedToMobile = false;
+      connectedToWeb = false;
+      connectedToMobile = false;
       updateStatusUI();
     });
 
@@ -101,54 +102,24 @@ window.FallbackUI = {
 
       const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
       const userId = localStorage.getItem("userId");
-      const currentRole = window.role || "web";
-
-      connectedToWeb = false;
-      connectedToMobile = false;
+      const currentRole = window.role || role;
 
       if (spaceId && userId && socket.connected) {
         console.log("🧠 Waiting for presence-update to restore state...");
-        console.log("⏳ Waiting 2s before rejoining space...");
-
         setTimeout(() => {
-          if (socket.connected) {
-            console.log("🔁 Rejoining space:", spaceId);
-            socket.emit("join-space", { spaceId, userId, role: currentRole });
+          console.log("⏳ Waiting 2s before rejoining space...");
+          socket.emit("join-space", { spaceId, userId, role: currentRole });
+          simulateFallback(socket, currentRole);
+          console.log("🔁 Rejoining space:", spaceId);
 
-            // Just in case presence-update is missed
-            setTimeout(() => {
-              console.log("🔍 Final UI fallback after rejoin");
-              updateStatusUI();
-            }, 2000);
-          }
+          setTimeout(() => {
+            console.log("🔍 Final UI fallback after rejoin");
+            socket.emit("manual-ping", { spaceId });
+          }, 3000);
         }, 2000);
-      } else {
-        console.warn("⚠️ Missing spaceId or userId on reconnect");
       }
-    });
 
-    socket.on("connect_error", () => {
-      console.warn("❌ Socket connect error");
-      statusEl.innerText = navigator.onLine
-        ? "⚠️ Server unreachable — retrying..."
-        : "🚫 No internet — retrying...";
-      statusEl.style.backgroundColor = navigator.onLine ? "#e17055" : "#d63031";
-    });
-
-    window.addEventListener("online", () => {
-      console.log("🌐 Internet back online");
-      statusEl.innerText = "🌐 Reconnecting...";
-      statusEl.style.backgroundColor = "#3498db";
-      if (!socket.connected && !reconnectCooldown) {
-        reconnectCooldown = true;
-        socket.connect();
-        setTimeout(() => (reconnectCooldown = false), 10000);
-      }
-    });
-
-    window.addEventListener("offline", () => {
-      statusEl.innerText = "🚫 Internet disconnected";
-      statusEl.style.backgroundColor = "#d63031";
+      updateStatusUI();
     });
   }
 };
