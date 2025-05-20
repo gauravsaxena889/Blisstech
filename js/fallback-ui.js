@@ -1,5 +1,3 @@
-// fallback-ui.js with auto reconnect & re-entry safe logic
-
 const statusEl = document.createElement("div");
 statusEl.style.position = "fixed";
 statusEl.style.bottom = "20px";
@@ -64,7 +62,6 @@ window.FallbackUI = {
   init(socket, role) {
     simulateFallback(socket, role);
 
-    // Global socket events
     socket.off("disconnect").on("disconnect", () => {
       console.warn("⚠️ Socket disconnected");
       connectedToWeb = false;
@@ -74,7 +71,7 @@ window.FallbackUI = {
 
     socket.off("connect").on("connect", () => {
       console.log("✅ Socket reconnected");
-      updateStatusUI();
+      updateStatusUI(); // handled above via re-init in main script
     });
   }
 };
