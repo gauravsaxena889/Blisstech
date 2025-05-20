@@ -120,17 +120,18 @@
  function createSpace() {
   fetch(backend + "/create-space", { method: 'POST' })
     .then(res => {
-      if (!res.ok) throw new Error("Server error");
+      if (!res.ok) throw new Error("Non-200 response");
       return res.json();
     })
     .then(data => {
+      if (!data.spaceId) throw new Error("Invalid response format");
       document.getElementById("spaceId").value = data.spaceId;
       renderQR(data.spaceId);
       socket.emit("join-space", { spaceId: data.spaceId, userId, role });
       FallbackUI.init(socket, role);
     })
     .catch(err => {
-      console.error("❌ Create space failed:", err);
+      console.error("❌ Space creation failed:", err);
       alert("❌ Failed to create space");
     });
 }
