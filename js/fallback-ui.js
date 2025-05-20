@@ -81,21 +81,26 @@ window.FallbackUI = {
     });
 
     socket.off("connect").on("connect", () => {
-      console.log("✅ Socket reconnected");
+  console.log("✅ Socket reconnected");
 
-      const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
-      const userId = localStorage.getItem("userId");
-      const role = window.role || "web";
+  const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
+  const userId = localStorage.getItem("userId");
+  const role = window.role || "web";
 
-      if (spaceId && userId && socket.connected) {
-        console.log("🔁 Rejoining space:", spaceId);
-        socket.emit("join-space", { spaceId, userId, role });
-        simulateFallback(socket, role);
-      } else {
-        console.warn("⚠️ Missing spaceId or userId on reconnect");
-      }
+  if (spaceId && userId && socket.connected) {
+    console.log("🔁 Rejoining space:", spaceId);
+    socket.emit("join-space", { spaceId, userId, role });
 
-      updateStatusUI();
-    });
+    // ✅ Reset states before re-simulating fallback
+    connectedToWeb = false;
+    connectedToMobile = false;
+    simulateFallback(socket, role);
+  } else {
+    console.warn("⚠️ Missing spaceId or userId on reconnect");
+  }
+
+  updateStatusUI();
+});
+
   }
 };
