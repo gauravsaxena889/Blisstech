@@ -89,62 +89,65 @@
     </div>
   </div>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script src="./js/fallback-ui.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="./js/fallback-ui.js"></script>
 
-<script>
-  const backend = "https://09af-2401-4900-8844-4fd4-514c-4325-bfd5-34ba.ngrok-free.app";
-  const socket = io(backend);
-  const userId = crypto.randomUUID();
+  <script>
+    const backend = "https://09af-2401-4900-8844-4fd4-514c-4325-bfd5-34ba.ngrok-free.app";
+    const socket = io(backend);
+    const userId = crypto.randomUUID();
+    const params = new URLSearchParams(location.search);
+    const role = params.get("role") || "web";
+    const joinedSpace = params.get("spaceId");
 
-  const params = new URLSearchParams(location.search);
-  const role = params.get("role") || "web";
-
- function renderQR(spaceId) {
-  const url = `${window.location.origin}/index.html?spaceId=${spaceId}&userId=${userId}&role=mobile`;
-  QRCode.toCanvas(document.getElementById("qrCanvas"), url, function (error) {
-    if (error) {
-      console.error("❌ QR render failed:", error);
-    } else {
-      console.log("✅ QR rendered for:", url);
+    function renderQR(spaceId) {
+      const url = `${window.location.origin}/index.html?spaceId=${spaceId}&userId=${userId}&role=mobile`;
+      QRCode.toCanvas(document.getElementById("qrCanvas"), url, (err) => {
+        if (err) console.error("❌ QR render failed:", err);
+        else console.log("✅ QR rendered for:", url);
+      });
     }
-  });
-}
 
-  function createSpace() {
-    fetch(backend + "/create-space", { method: 'POST' })
-      .then(res => res.json())
-      .then(data => {
-        document.getElementById("spaceId").value = data.spaceId;
-        renderQR(data.spaceId);
-        socket.emit("join-space", { spaceId: data.spaceId, userId, role });
+    function createSpace() {
+      fetch(backend + "/create-space", { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("spaceId").value = data.spaceId;
+          renderQR(data.spaceId);
+          socket.emit("join-space", { spaceId: data.spaceId, userId, role });
+        })
+        .catch(err => alert("❌ Failed to create space"));
+    }
+
+    function joinSpace() {
+      const spaceId = document.getElementById("spaceId").value.trim();
+      if (!spaceId) return alert("Enter a valid space ID");
+
+      fetch(backend + "/join-space", {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spaceId })
       })
-      .catch(err => alert("❌ Failed to create space"));
-  }
+      .then(res => {
+        if (!res.ok) throw new Error("Space not found");
+        renderQR(spaceId);
+        socket.emit("join-space", { spaceId, userId, role });
+      })
+      .catch(err => alert("❌ " + err.message));
+    }
 
-  function joinSpace() {
-    const spaceId = document.getElementById("spaceId").value.trim();
-    if (!spaceId) return alert("Enter a valid space ID");
-
-    fetch(backend + "/join-space", {
-      method: 'POST',
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ spaceId })
-    })
-    .then(res => {
-      if (!res.ok) throw new Error("Space not found");
-      renderQR(spaceId);
-      socket.emit("join-space", { spaceId, userId, role });
-    })
-    .catch(err => alert("❌ " + err.message));
-  }
-
-  window.onload = () => {
-    renderQR("pending");
-    FallbackUI.init(socket, role);
-  };
-</script>
+    window.onload = () => {
+      if (joinedSpace) {
+        document.getElementById("spaceId").value = joinedSpace;
+        socket.emit("join-space", { spaceId: joinedSpace, userId, role });
+        renderQR(joinedSpace); // Also show QR if reloaded on mobile
+      } else {
+        renderQR("pending");
+      }
+      FallbackUI.init(socket, role);
+    };
+  </script>
 
 </body>
 </html>
