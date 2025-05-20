@@ -91,10 +91,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-  <script src="./js/fallback-ui.js"></script>
+  <script src="./js/fallback-ui-final.js"></script>
 
   <script>
-    const backend = "https://e5d1-106-219-164-83.ngrok-free.app"; // ← Change to your active URL
+    const backend = "https://e5d1-106-219-164-83.ngrok-free.app"; // ✅ Change if needed
     const socket = io(backend, {
       transports: ['websocket'],
       secure: true,
@@ -104,52 +104,48 @@
       timeout: 3000
     });
 
-// Persistent ID + Space logic
-let userId = localStorage.getItem("userId");
-if (!userId) {
-  userId = crypto.randomUUID();
-  localStorage.setItem("userId", userId);
-}
+    let alreadyJoined = false;
 
-const params = new URLSearchParams(location.search);
-const role = params.get("role") || "web";
+    // Persistent identity
+    let userId = localStorage.getItem("userId");
+    if (!userId) {
+      userId = crypto.randomUUID();
+      localStorage.setItem("userId", userId);
+    }
 
-let joinedSpace = params.get("spaceId");
-if (!joinedSpace) {
-  joinedSpace = localStorage.getItem("lastSpace");
-}
-if (joinedSpace) {
-  localStorage.setItem("lastSpace", joinedSpace);
-}
+    // Params and role
+    const params = new URLSearchParams(location.search);
+    const role = params.get("role") || "web";
+    let joinedSpace = params.get("spaceId") || localStorage.getItem("lastSpace");
 
+    if (joinedSpace) localStorage.setItem("lastSpace", joinedSpace);
 
     function renderQR(spaceId) {
-      const url = `${window.location.origin}${window.location.pathname}?spaceId=${spaceId}&userId=${userId}&role=mobile`;
+      const url = `${window.location.origin}${window.location.pathname}?spaceId=${spaceId}&role=mobile`;
       QRCode.toCanvas(document.getElementById("qrCanvas"), url, (err) => {
         if (err) console.error("❌ QR render failed:", err);
-        else console.log("✅ QR rendered for:", url);
+        else console.log("✅ QR rendered:", url);
       });
     }
 
- function createSpace() {
-  fetch(backend + "/create-space", { method: 'POST' })
-    .then(res => {
-      if (!res.ok) throw new Error("Non-200 response");
-      return res.json();
-    })
-    .then(data => {
-      if (!data.spaceId) throw new Error("Invalid response format");
-      document.getElementById("spaceId").value = data.spaceId;
-      renderQR(data.spaceId);
-      socket.emit("join-space", { spaceId: data.spaceId, userId, role });
-      FallbackUI.init(socket, role);
-    })
-    .catch(err => {
-      console.error("❌ Space creation failed:", err);
-      alert("❌ Failed to create space");
-    });
-}
-
+    function createSpace() {
+      fetch(backend + "/create-space", { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          const spaceId = data.spaceId;
+          document.getElementById("spaceId").value = spaceId;
+          joinedSpace = spaceId;
+          localStorage.setItem("lastSpace", spaceId);
+          renderQR(spaceId);
+          socket.emit("join-space", { spaceId, userId, role });
+          alreadyJoined = true;
+          FallbackUI.init(socket, role);
+        })
+        .catch(err => {
+          console.error("❌ Failed to create space:", err);
+          alert("❌ Failed to create space");
+        });
+    }
 
     function joinSpace() {
       const spaceId = document.getElementById("spaceId").value.trim();
@@ -162,18 +158,22 @@ if (joinedSpace) {
       })
         .then(res => {
           if (!res.ok) throw new Error("Space not found");
+          joinedSpace = spaceId;
+          localStorage.setItem("lastSpace", spaceId);
           renderQR(spaceId);
           socket.emit("join-space", { spaceId, userId, role });
+          alreadyJoined = true;
           FallbackUI.init(socket, role);
         })
         .catch(err => alert("❌ " + err.message));
     }
 
     socket.on("connect", () => {
-      console.log("✅ Socket connected/reconnected");
-      if (joinedSpace) {
+      console.log("✅ Socket connected");
+      if (joinedSpace && !alreadyJoined) {
         socket.emit("join-space", { spaceId: joinedSpace, userId, role });
         FallbackUI.init(socket, role);
+        alreadyJoined = true;
       }
     });
 
@@ -185,8 +185,11 @@ if (joinedSpace) {
       if (joinedSpace) {
         document.getElementById("spaceId").value = joinedSpace;
         renderQR(joinedSpace);
-        socket.emit("join-space", { spaceId: joinedSpace, userId, role });
-        FallbackUI.init(socket, role);
+        if (!alreadyJoined) {
+          socket.emit("join-space", { spaceId: joinedSpace, userId, role });
+          FallbackUI.init(socket, role);
+          alreadyJoined = true;
+        }
       } else {
         renderQR("pending");
       }
