@@ -40,7 +40,7 @@ function updateStatusUI() {
   }
 }
 
-function simulateFallback(socket, currentRole) {
+function simulateFallback(socket, role) {
   [
     "mobile-joined",
     "mobile-disconnected",
@@ -77,6 +77,10 @@ function simulateFallback(socket, currentRole) {
     console.log("📡 presence-update →", users);
     connectedToWeb = users.some(u => u.role === "web");
     connectedToMobile = users.some(u => u.role === "mobile");
+
+    if (role === "web" && socket.connected) connectedToWeb = true;
+    if (role === "mobile" && socket.connected) connectedToMobile = true;
+
     updateStatusUI();
   });
 
