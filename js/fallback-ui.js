@@ -80,7 +80,7 @@ window.FallbackUI = {
       updateStatusUI();
     });
 
-    socket.off("connect").on("connect", () => {
+   socket.off("connect").on("connect", () => {
   console.log("✅ Socket reconnected");
 
   const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
@@ -91,15 +91,16 @@ window.FallbackUI = {
     console.log("🔁 Rejoining space:", spaceId);
     socket.emit("join-space", { spaceId, userId, role });
 
-    // ✅ Reset states before re-simulating fallback
+    // ✅ Reset fallback state before re-initializing
     connectedToWeb = false;
     connectedToMobile = false;
-    simulateFallback(socket, role);
+
+    simulateFallback(socket, role); // clean listeners + fresh state
   } else {
     console.warn("⚠️ Missing spaceId or userId on reconnect");
   }
 
-  updateStatusUI();
+  updateStatusUI(); // still needed to reflect any visual fallback
 });
 
   }
