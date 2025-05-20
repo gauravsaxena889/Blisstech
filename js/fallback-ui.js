@@ -1,4 +1,4 @@
-// fallback-ui-final.js — with full cross-device listener sync + persistent UI
+// fallback-ui-final.js — with full listener sync, reconnect rejoin, and debug logs
 
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
@@ -42,20 +42,26 @@ function simulateFallback(socket, currentRole) {
   if (currentRole === "web") connectedToWeb = true;
   if (currentRole === "mobile") connectedToMobile = true;
 
-  // Register all event listeners regardless of role
   socket.off("mobile-joined").on("mobile-joined", () => {
+    console.log("📲 Mobile joined event received");
     connectedToMobile = true;
     updateStatusUI();
   });
+
   socket.off("mobile-disconnected").on("mobile-disconnected", () => {
+    console.log("📴 Mobile disconnected event received");
     connectedToMobile = false;
     updateStatusUI();
   });
+
   socket.off("web-joined").on("web-joined", () => {
+    console.log("🖥️ Web joined event received");
     connectedToWeb = true;
     updateStatusUI();
   });
+
   socket.off("web-disconnected").on("web-disconnected", () => {
+    console.log("🛑 Web disconnected event received");
     connectedToWeb = false;
     updateStatusUI();
   });
@@ -76,6 +82,19 @@ window.FallbackUI = {
 
     socket.off("connect").on("connect", () => {
       console.log("✅ Socket reconnected");
+
+      const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
+      const userId = localStorage.getItem("userId");
+      const role = window.role || "web";
+
+      if (spaceId && userId && socket.connected) {
+        console.log("🔁 Rejoining space:", spaceId);
+        socket.emit("join-space", { spaceId, userId, role });
+        simulateFallback(socket, role);
+      } else {
+        console.warn("⚠️ Missing spaceId or userId on reconnect");
+      }
+
       updateStatusUI();
     });
   }
