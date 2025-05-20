@@ -1,4 +1,4 @@
-// fallback-ui-final.js — with full listener sync, reconnect rejoin, and debug logs
+// fallback-ui-final.js — with full listener sync, reconnect rejoin, and status reset
 
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
@@ -71,6 +71,10 @@ function simulateFallback(socket, currentRole) {
 
 window.FallbackUI = {
   init(socket, role) {
+    // Reset previous connection state before binding
+    connectedToWeb = false;
+    connectedToMobile = false;
+
     simulateFallback(socket, role);
 
     socket.off("disconnect").on("disconnect", () => {
@@ -80,28 +84,26 @@ window.FallbackUI = {
       updateStatusUI();
     });
 
-   socket.off("connect").on("connect", () => {
-  console.log("✅ Socket reconnected");
+    socket.off("connect").on("connect", () => {
+      console.log("✅ Socket reconnected");
 
-  const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
-  const userId = localStorage.getItem("userId");
-  const role = window.role || "web";
+      const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
+      const userId = localStorage.getItem("userId");
+      const role = window.role || "web";
 
-  if (spaceId && userId && socket.connected) {
-    console.log("🔁 Rejoining space:", spaceId);
-    socket.emit("join-space", { spaceId, userId, role });
+      // Reset status again to avoid stale flags
+      connectedToWeb = false;
+      connectedToMobile = false;
 
-    // ✅ Reset fallback state before re-initializing
-    connectedToWeb = false;
-    connectedToMobile = false;
+      if (spaceId && userId && socket.connected) {
+        console.log("🔁 Rejoining space:", spaceId);
+        socket.emit("join-space", { spaceId, userId, role });
+        simulateFallback(socket, role);
+      } else {
+        console.warn("⚠️ Missing spaceId or userId on reconnect");
+      }
 
-    simulateFallback(socket, role); // clean listeners + fresh state
-  } else {
-    console.warn("⚠️ Missing spaceId or userId on reconnect");
-  }
-
-  updateStatusUI(); // still needed to reflect any visual fallback
-});
-
+      updateStatusUI();
+    });
   }
 };
