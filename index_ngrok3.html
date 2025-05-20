@@ -89,7 +89,10 @@
     </div>
   </div>
 
-  <script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="./js/fallback-ui.js"></script> <!-- or remove if not using fallback display -->
+
   const backend = "https://09af-2401-4900-8844-4fd4-514c-4325-bfd5-34ba.ngrok-free.app";
   const socket = io(backend);
   const userId = crypto.randomUUID();
