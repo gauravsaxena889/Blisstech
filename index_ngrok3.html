@@ -102,7 +102,7 @@
     const joinedSpace = params.get("spaceId");
 
     function renderQR(spaceId) {
-      const url = `${window.location.origin}/index.html?spaceId=${spaceId}&userId=${userId}&role=mobile`;
+      const url = `${window.location.origin}/index_ngrok3.html?spaceId=${spaceId}&userId=${userId}&role=mobile`;
       QRCode.toCanvas(document.getElementById("qrCanvas"), url, (err) => {
         if (err) console.error("❌ QR render failed:", err);
         else console.log("✅ QR rendered for:", url);
