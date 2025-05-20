@@ -1,17 +1,23 @@
-const statusEl = document.createElement("div");
-statusEl.style.position = "fixed";
-statusEl.style.bottom = "20px";
-statusEl.style.right = "20px";
-statusEl.style.padding = "12px 20px";
-statusEl.style.borderRadius = "8px";
-statusEl.style.fontFamily = "Inter, sans-serif";
-statusEl.style.fontSize = "14px";
-statusEl.style.color = "#fff";
-statusEl.style.backgroundColor = "#6c5ce7";
-statusEl.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
-statusEl.style.zIndex = 9999;
-statusEl.innerText = "🔄 Connecting...";
-document.body.appendChild(statusEl);
+// fallback-ui-final.js — with persistent status bar and reconnect-safe logic
+
+let statusEl = document.getElementById("fallbackStatus");
+if (!statusEl) {
+  statusEl = document.createElement("div");
+  statusEl.id = "fallbackStatus";
+  statusEl.style.position = "fixed";
+  statusEl.style.bottom = "20px";
+  statusEl.style.right = "20px";
+  statusEl.style.padding = "12px 20px";
+  statusEl.style.borderRadius = "8px";
+  statusEl.style.fontFamily = "Inter, sans-serif";
+  statusEl.style.fontSize = "14px";
+  statusEl.style.color = "#fff";
+  statusEl.style.backgroundColor = "#6c5ce7";
+  statusEl.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+  statusEl.style.zIndex = 9999;
+  statusEl.innerText = "🔄 Connecting...";
+  document.body.appendChild(statusEl);
+}
 
 let connectedToWeb = false;
 let connectedToMobile = false;
