@@ -1,4 +1,4 @@
-// fallback-ui-final.js — robust fallback with smart reconnect + internet check
+// fallback-ui-final.js — stable fallback with smart reconnect and role-sensitive sync
 
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
@@ -40,6 +40,7 @@ function updateStatusUI() {
 }
 
 function simulateFallback(socket, currentRole) {
+  // Clean up all prior listeners
   [
     "mobile-joined",
     "mobile-disconnected",
@@ -75,6 +76,7 @@ function simulateFallback(socket, currentRole) {
   socket.on("presence-update", ({ users }) => {
     connectedToWeb = users.some(u => u.role === "web");
     connectedToMobile = users.some(u => u.role === "mobile");
+    console.log("🔁 Synced from presence-update");
     updateStatusUI();
   });
 
@@ -87,8 +89,14 @@ window.FallbackUI = {
 
     socket.off("disconnect").on("disconnect", () => {
       console.warn("⚠️ Socket disconnected");
-      connectedToWeb = false;
-      connectedToMobile = false;
+
+      const currentRole = window.role || "web";
+      if (currentRole === "web") {
+        connectedToWeb = false;
+      } else if (currentRole === "mobile") {
+        connectedToMobile = false;
+      }
+
       updateStatusUI();
     });
 
@@ -142,15 +150,15 @@ window.FallbackUI = {
         reconnectCooldown = true;
         console.log("🌐 Triggering smart reconnect...");
         socket.connect();
-        setTimeout(() => reconnectCooldown = false, 10000); // 10s cooldown
+        setTimeout(() => reconnectCooldown = false, 10000);
       }
     }
 
     window.addEventListener("online", () => {
       console.log("🌐 Internet back online");
-      statusEl.innerText = "🌐 Internet restored";
-      statusEl.style.backgroundColor = "#27ae60";
-      setTimeout(attemptSmartReconnect, 1500);
+      statusEl.innerText = "🌐 Reconnecting...";
+      statusEl.style.backgroundColor = "#3498db";
+      setTimeout(attemptSmartReconnect, 300);
     });
 
     window.addEventListener("offline", () => {
