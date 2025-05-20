@@ -1,4 +1,4 @@
-// fallback-ui-final.js — polished fallback logic with accurate role sync
+// fallback-ui-final.js — production fallback with force-sync logic
 
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
@@ -52,6 +52,13 @@ function simulateFallback(socket, currentRole) {
     console.log("📲 Mobile joined");
     connectedToMobile = true;
     updateStatusUI();
+
+    setTimeout(() => {
+      if (!connectedToWeb || !connectedToMobile) {
+        console.log("🔍 Forcing UI resync after mobile-joined");
+        updateStatusUI();
+      }
+    }, 1500);
   });
 
   socket.on("mobile-disconnected", () => {
@@ -132,9 +139,8 @@ window.FallbackUI = {
             console.log("🔁 Rejoining space:", spaceId);
             socket.emit("join-space", { spaceId, userId, role: currentRole });
 
-            // force fallback UI resync in case presence-update is delayed
             setTimeout(() => {
-              console.log("🔍 Forcing fallback UI re-check after join");
+              console.log("🔍 Final UI fallback after rejoin");
               updateStatusUI();
             }, 3000);
           }
