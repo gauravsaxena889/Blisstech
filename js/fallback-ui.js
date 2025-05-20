@@ -1,4 +1,4 @@
-// fallback-ui-final.js — stable fallback with smart reconnect and role-sensitive sync
+// fallback-ui-final.js — polished fallback logic with accurate role sync
 
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
@@ -40,7 +40,6 @@ function updateStatusUI() {
 }
 
 function simulateFallback(socket, currentRole) {
-  // Clean up all prior listeners
   [
     "mobile-joined",
     "mobile-disconnected",
@@ -74,10 +73,24 @@ function simulateFallback(socket, currentRole) {
   });
 
   socket.on("presence-update", ({ users }) => {
+    const oldWeb = connectedToWeb;
+    const oldMobile = connectedToMobile;
+
     connectedToWeb = users.some(u => u.role === "web");
     connectedToMobile = users.some(u => u.role === "mobile");
-    console.log("🔁 Synced from presence-update");
-    updateStatusUI();
+
+    console.log("📡 presence-update →", {
+      connectedToWeb,
+      connectedToMobile,
+      from: users
+    });
+
+    if (
+      connectedToWeb !== oldWeb ||
+      connectedToMobile !== oldMobile
+    ) {
+      updateStatusUI();
+    }
   });
 
   updateStatusUI();
@@ -89,14 +102,12 @@ window.FallbackUI = {
 
     socket.off("disconnect").on("disconnect", () => {
       console.warn("⚠️ Socket disconnected");
-
       const currentRole = window.role || "web";
       if (currentRole === "web") {
         connectedToWeb = false;
-      } else if (currentRole === "mobile") {
+      } else {
         connectedToMobile = false;
       }
-
       updateStatusUI();
     });
 
@@ -120,6 +131,12 @@ window.FallbackUI = {
           if (socket.connected) {
             console.log("🔁 Rejoining space:", spaceId);
             socket.emit("join-space", { spaceId, userId, role: currentRole });
+
+            // force fallback UI resync in case presence-update is delayed
+            setTimeout(() => {
+              console.log("🔍 Forcing fallback UI re-check after join");
+              updateStatusUI();
+            }, 3000);
           }
         }, 2000);
       } else {
@@ -144,7 +161,6 @@ window.FallbackUI = {
       statusEl.style.backgroundColor = "#a29bfe";
     });
 
-    // Smart manual reconnect trigger on network recovery
     function attemptSmartReconnect() {
       if (navigator.onLine && !socket.connected && !reconnectCooldown) {
         reconnectCooldown = true;
