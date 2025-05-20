@@ -91,26 +91,27 @@ window.FallbackUI = {
       updateStatusUI();
     });
 
-    socket.off("connect").on("connect", () => {
-      console.log("✅ Socket reconnected");
+   socket.off("connect").on("connect", () => {
+  console.log("✅ Socket reconnected");
 
-      const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
-      const userId = localStorage.getItem("userId");
-      const currentRole = window.role || "web";
+  const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
+  const userId = localStorage.getItem("userId");
+  const currentRole = window.role || "web";
 
-      console.log("🧠 Waiting for presence-update to restore state...");
+  console.log("🧠 Waiting for presence-update to restore state...");
 
-      if (spaceId && userId && socket.connected) {
-        if (socket.data?.spaceId === spaceId && socket.data?.userId === userId) {
-          console.log("🟡 Already joined, skipping rejoin.");
-          return;
-        }
+  if (spaceId && userId && socket.connected) {
+    if (socket.data?.spaceId === spaceId && socket.data?.userId === userId) {
+      console.log("🟡 Already joined, skipping rejoin.");
+      return;
+    }
 
-        console.log("🔁 Rejoining space:", spaceId);
-        socket.emit("join-space", { spaceId, userId, role: currentRole });
-      } else {
-        console.warn("⚠️ Missing spaceId or userId on reconnect");
-      }
+    console.log("🔁 Rejoining space:", spaceId);
+    socket.emit("join-space", { spaceId, userId, role: currentRole });
+  } else {
+    console.warn("⚠️ Missing spaceId or userId on reconnect");
+  }
+});
 
       // simulateFallback is NOT called here again
     });
