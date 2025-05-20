@@ -1,4 +1,4 @@
-// fallback-ui-final.js — with full listener sync, reconnect rejoin, and status reset
+// fallback-ui-final.js — robust fallback status sync and reconnect support
 
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
@@ -39,30 +39,42 @@ function updateStatusUI() {
 }
 
 function simulateFallback(socket, currentRole) {
-  if (currentRole === "web") connectedToWeb = true;
-  if (currentRole === "mobile") connectedToMobile = true;
+  // Clean up listeners to avoid duplication
+  [
+    "mobile-joined",
+    "mobile-disconnected",
+    "web-joined",
+    "web-disconnected",
+    "presence-update"
+  ].forEach(event => socket.off(event));
 
-  socket.off("mobile-joined").on("mobile-joined", () => {
-    console.log("📲 Mobile joined event received");
+  socket.on("mobile-joined", () => {
+    console.log("📲 Mobile joined");
     connectedToMobile = true;
     updateStatusUI();
   });
 
-  socket.off("mobile-disconnected").on("mobile-disconnected", () => {
-    console.log("📴 Mobile disconnected event received");
+  socket.on("mobile-disconnected", () => {
+    console.log("📴 Mobile disconnected");
     connectedToMobile = false;
     updateStatusUI();
   });
 
-  socket.off("web-joined").on("web-joined", () => {
-    console.log("🖥️ Web joined event received");
+  socket.on("web-joined", () => {
+    console.log("🖥️ Web joined");
     connectedToWeb = true;
     updateStatusUI();
   });
 
-  socket.off("web-disconnected").on("web-disconnected", () => {
-    console.log("🛑 Web disconnected event received");
+  socket.on("web-disconnected", () => {
+    console.log("🛑 Web disconnected");
     connectedToWeb = false;
+    updateStatusUI();
+  });
+
+  socket.on("presence-update", ({ users }) => {
+    connectedToWeb = users.some(u => u.role === "web");
+    connectedToMobile = users.some(u => u.role === "mobile");
     updateStatusUI();
   });
 
@@ -71,7 +83,7 @@ function simulateFallback(socket, currentRole) {
 
 window.FallbackUI = {
   init(socket, role) {
-    // Reset previous connection state before binding
+    // Reset connection flags
     connectedToWeb = false;
     connectedToMobile = false;
 
@@ -89,16 +101,20 @@ window.FallbackUI = {
 
       const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
       const userId = localStorage.getItem("userId");
-      const role = window.role || "web";
+      const currentRole = window.role || "web";
 
-      // Reset status again to avoid stale flags
       connectedToWeb = false;
       connectedToMobile = false;
 
       if (spaceId && userId && socket.connected) {
+        // Avoid duplicate join on reconnect
+        if (socket.data?.spaceId === spaceId && socket.data?.userId === userId) {
+          console.log("🟡 Already joined, skipping rejoin.");
+          return;
+        }
         console.log("🔁 Rejoining space:", spaceId);
-        socket.emit("join-space", { spaceId, userId, role });
-        simulateFallback(socket, role);
+        socket.emit("join-space", { spaceId, userId, role: currentRole });
+        simulateFallback(socket, currentRole);
       } else {
         console.warn("⚠️ Missing spaceId or userId on reconnect");
       }
