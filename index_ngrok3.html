@@ -101,16 +101,16 @@
   const params = new URLSearchParams(location.search);
   const role = params.get("role") || "web";
 
-  function renderQR(spaceId) {
-    const url = `${backend}/space.html?spaceId=${spaceId}&userId=${userId}&role=mobile`;
-    QRCode.toCanvas(document.getElementById("qrCanvas"), url, function (error) {
-      if (error) {
-        console.error("❌ QR render failed:", error);
-      } else {
-        console.log("✅ QR rendered for:", url);
-      }
-    });
-  }
+ function renderQR(spaceId) {
+  const url = `${window.location.origin}/index.html?spaceId=${spaceId}&userId=${userId}&role=mobile`;
+  QRCode.toCanvas(document.getElementById("qrCanvas"), url, function (error) {
+    if (error) {
+      console.error("❌ QR render failed:", error);
+    } else {
+      console.log("✅ QR rendered for:", url);
+    }
+  });
+}
 
   function createSpace() {
     fetch(backend + "/create-space", { method: 'POST' })
