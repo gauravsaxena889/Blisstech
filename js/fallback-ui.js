@@ -1,5 +1,3 @@
-// fallback-ui-final.js — production fallback with force-sync logic
-
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
   statusEl = document.createElement("div");
@@ -49,42 +47,31 @@ function simulateFallback(socket, currentRole) {
   ].forEach(event => socket.off(event));
 
   socket.on("mobile-joined", () => {
-    console.log("📲 Mobile joined");
     connectedToMobile = true;
     updateStatusUI();
-
-    setTimeout(() => {
-      if (!connectedToWeb || !connectedToMobile) {
-        console.log("🔍 Forcing UI resync after mobile-joined");
-        updateStatusUI();
-      }
-    }, 1500);
   });
 
   socket.on("mobile-disconnected", () => {
-    console.log("📴 Mobile disconnected");
     connectedToMobile = false;
     updateStatusUI();
   });
 
   socket.on("web-joined", () => {
-    console.log("🖥️ Web joined");
     connectedToWeb = true;
     updateStatusUI();
   });
 
   socket.on("web-disconnected", () => {
-    console.log("🛑 Web disconnected");
     connectedToWeb = false;
     updateStatusUI();
   });
 
   socket.on("presence-update", ({ users }) => {
-    const oldWeb = connectedToWeb;
-    const oldMobile = connectedToMobile;
+    const webPresent = users.some(u => u.role === "web");
+    const mobilePresent = users.some(u => u.role === "mobile");
 
-    connectedToWeb = users.some(u => u.role === "web");
-    connectedToMobile = users.some(u => u.role === "mobile");
+    connectedToWeb = webPresent;
+    connectedToMobile = mobilePresent;
 
     console.log("📡 presence-update →", {
       connectedToWeb,
@@ -92,12 +79,7 @@ function simulateFallback(socket, currentRole) {
       from: users
     });
 
-    if (
-      connectedToWeb !== oldWeb ||
-      connectedToMobile !== oldMobile
-    ) {
-      updateStatusUI();
-    }
+    updateStatusUI();
   });
 
   updateStatusUI();
@@ -109,12 +91,8 @@ window.FallbackUI = {
 
     socket.off("disconnect").on("disconnect", () => {
       console.warn("⚠️ Socket disconnected");
-      const currentRole = window.role || "web";
-      if (currentRole === "web") {
-        connectedToWeb = false;
-      } else {
-        connectedToMobile = false;
-      }
+      if (role === "web") connectedToWeb = false;
+      if (role === "mobile") connectedToMobile = false;
       updateStatusUI();
     });
 
@@ -125,24 +103,23 @@ window.FallbackUI = {
       const userId = localStorage.getItem("userId");
       const currentRole = window.role || "web";
 
-      console.log("🧠 Waiting for presence-update to restore state...");
+      connectedToWeb = false;
+      connectedToMobile = false;
 
       if (spaceId && userId && socket.connected) {
-        if (socket.data?.spaceId === spaceId && socket.data?.userId === userId) {
-          console.log("🟡 Already joined, skipping rejoin.");
-          return;
-        }
-
+        console.log("🧠 Waiting for presence-update to restore state...");
         console.log("⏳ Waiting 2s before rejoining space...");
+
         setTimeout(() => {
           if (socket.connected) {
             console.log("🔁 Rejoining space:", spaceId);
             socket.emit("join-space", { spaceId, userId, role: currentRole });
 
+            // Just in case presence-update is missed
             setTimeout(() => {
               console.log("🔍 Final UI fallback after rejoin");
               updateStatusUI();
-            }, 3000);
+            }, 2000);
           }
         }, 2000);
       } else {
@@ -152,39 +129,24 @@ window.FallbackUI = {
 
     socket.on("connect_error", () => {
       console.warn("❌ Socket connect error");
-      if (!navigator.onLine) {
-        statusEl.innerText = "🚫 No internet — retrying when back";
-        statusEl.style.backgroundColor = "#d63031";
-      } else {
-        statusEl.innerText = "⚠️ Server unreachable — retrying...";
-        statusEl.style.backgroundColor = "#e17055";
-      }
+      statusEl.innerText = navigator.onLine
+        ? "⚠️ Server unreachable — retrying..."
+        : "🚫 No internet — retrying...";
+      statusEl.style.backgroundColor = navigator.onLine ? "#e17055" : "#d63031";
     });
-
-    socket.on("reconnect_attempt", (attempt) => {
-      console.log(`🔁 Reconnect attempt #${attempt}`);
-      statusEl.innerText = `🔄 Trying to reconnect... (attempt ${attempt})`;
-      statusEl.style.backgroundColor = "#a29bfe";
-    });
-
-    function attemptSmartReconnect() {
-      if (navigator.onLine && !socket.connected && !reconnectCooldown) {
-        reconnectCooldown = true;
-        console.log("🌐 Triggering smart reconnect...");
-        socket.connect();
-        setTimeout(() => reconnectCooldown = false, 10000);
-      }
-    }
 
     window.addEventListener("online", () => {
       console.log("🌐 Internet back online");
       statusEl.innerText = "🌐 Reconnecting...";
       statusEl.style.backgroundColor = "#3498db";
-      setTimeout(attemptSmartReconnect, 300);
+      if (!socket.connected && !reconnectCooldown) {
+        reconnectCooldown = true;
+        socket.connect();
+        setTimeout(() => (reconnectCooldown = false), 10000);
+      }
     });
 
     window.addEventListener("offline", () => {
-      console.warn("🚫 Internet connection lost");
       statusEl.innerText = "🚫 Internet disconnected";
       statusEl.style.backgroundColor = "#d63031";
     });
