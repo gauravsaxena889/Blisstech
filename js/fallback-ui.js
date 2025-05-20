@@ -1,4 +1,4 @@
-// fallback-ui-final.js — with persistent status bar and reconnect-safe logic
+// fallback-ui-final.js — with full cross-device listener sync + persistent UI
 
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
@@ -39,27 +39,26 @@ function updateStatusUI() {
 }
 
 function simulateFallback(socket, currentRole) {
-  if (currentRole === "web") {
-    connectedToWeb = true;
-    socket.off("mobile-joined").on("mobile-joined", () => {
-      connectedToMobile = true;
-      updateStatusUI();
-    });
-    socket.off("mobile-disconnected").on("mobile-disconnected", () => {
-      connectedToMobile = false;
-      updateStatusUI();
-    });
-  } else if (currentRole === "mobile") {
+  if (currentRole === "web") connectedToWeb = true;
+  if (currentRole === "mobile") connectedToMobile = true;
+
+  // Register all event listeners regardless of role
+  socket.off("mobile-joined").on("mobile-joined", () => {
     connectedToMobile = true;
-    socket.off("web-joined").on("web-joined", () => {
-      connectedToWeb = true;
-      updateStatusUI();
-    });
-    socket.off("web-disconnected").on("web-disconnected", () => {
-      connectedToWeb = false;
-      updateStatusUI();
-    });
-  }
+    updateStatusUI();
+  });
+  socket.off("mobile-disconnected").on("mobile-disconnected", () => {
+    connectedToMobile = false;
+    updateStatusUI();
+  });
+  socket.off("web-joined").on("web-joined", () => {
+    connectedToWeb = true;
+    updateStatusUI();
+  });
+  socket.off("web-disconnected").on("web-disconnected", () => {
+    connectedToWeb = false;
+    updateStatusUI();
+  });
 
   updateStatusUI();
 }
@@ -77,7 +76,7 @@ window.FallbackUI = {
 
     socket.off("connect").on("connect", () => {
       console.log("✅ Socket reconnected");
-      updateStatusUI(); // handled above via re-init in main script
+      updateStatusUI();
     });
   }
 };
