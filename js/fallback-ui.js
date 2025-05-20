@@ -1,5 +1,5 @@
+// fallback-ui.js with auto reconnect & re-entry safe logic
 
-// fallback-ui.js
 const statusEl = document.createElement("div");
 statusEl.style.position = "fixed";
 statusEl.style.bottom = "20px";
@@ -34,25 +34,24 @@ function updateStatusUI() {
   }
 }
 
-// simulate socket fallback triggers
 function simulateFallback(socket, currentRole) {
   if (currentRole === "web") {
     connectedToWeb = true;
-    socket.on("mobile-joined", () => {
+    socket.off("mobile-joined").on("mobile-joined", () => {
       connectedToMobile = true;
       updateStatusUI();
     });
-    socket.on("mobile-disconnected", () => {
+    socket.off("mobile-disconnected").on("mobile-disconnected", () => {
       connectedToMobile = false;
       updateStatusUI();
     });
   } else if (currentRole === "mobile") {
     connectedToMobile = true;
-    socket.on("web-joined", () => {
+    socket.off("web-joined").on("web-joined", () => {
       connectedToWeb = true;
       updateStatusUI();
     });
-    socket.on("web-disconnected", () => {
+    socket.off("web-disconnected").on("web-disconnected", () => {
       connectedToWeb = false;
       updateStatusUI();
     });
@@ -61,9 +60,21 @@ function simulateFallback(socket, currentRole) {
   updateStatusUI();
 }
 
-// expose for import
 window.FallbackUI = {
   init(socket, role) {
     simulateFallback(socket, role);
+
+    // Global socket events
+    socket.off("disconnect").on("disconnect", () => {
+      console.warn("⚠️ Socket disconnected");
+      connectedToWeb = false;
+      connectedToMobile = false;
+      updateStatusUI();
+    });
+
+    socket.off("connect").on("connect", () => {
+      console.log("✅ Socket reconnected");
+      updateStatusUI();
+    });
   }
 };
