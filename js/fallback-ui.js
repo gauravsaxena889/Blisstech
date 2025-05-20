@@ -39,7 +39,6 @@ function updateStatusUI() {
 }
 
 function simulateFallback(socket, currentRole) {
-  // Clean up listeners to avoid duplication
   [
     "mobile-joined",
     "mobile-disconnected",
@@ -83,10 +82,6 @@ function simulateFallback(socket, currentRole) {
 
 window.FallbackUI = {
   init(socket, role) {
-    // Reset connection flags
-    connectedToWeb = false;
-    connectedToMobile = false;
-
     simulateFallback(socket, role);
 
     socket.off("disconnect").on("disconnect", () => {
@@ -103,23 +98,21 @@ window.FallbackUI = {
       const userId = localStorage.getItem("userId");
       const currentRole = window.role || "web";
 
-      connectedToWeb = false;
-      connectedToMobile = false;
+      console.log("🧠 Waiting for presence-update to restore state...");
 
       if (spaceId && userId && socket.connected) {
-        // Avoid duplicate join on reconnect
         if (socket.data?.spaceId === spaceId && socket.data?.userId === userId) {
           console.log("🟡 Already joined, skipping rejoin.");
           return;
         }
+
         console.log("🔁 Rejoining space:", spaceId);
         socket.emit("join-space", { spaceId, userId, role: currentRole });
-        simulateFallback(socket, currentRole);
       } else {
         console.warn("⚠️ Missing spaceId or userId on reconnect");
       }
 
-      updateStatusUI();
+      // simulateFallback is NOT called here again
     });
   }
 };
