@@ -104,10 +104,24 @@
       timeout: 3000
     });
 
-    const userId = crypto.randomUUID();
-    const params = new URLSearchParams(location.search);
-    const role = params.get("role") || "web";
-    const joinedSpace = params.get("spaceId");
+// Persistent ID + Space logic
+let userId = localStorage.getItem("userId");
+if (!userId) {
+  userId = crypto.randomUUID();
+  localStorage.setItem("userId", userId);
+}
+
+const params = new URLSearchParams(location.search);
+const role = params.get("role") || "web";
+
+let joinedSpace = params.get("spaceId");
+if (!joinedSpace) {
+  joinedSpace = localStorage.getItem("lastSpace");
+}
+if (joinedSpace) {
+  localStorage.setItem("lastSpace", joinedSpace);
+}
+
 
     function renderQR(spaceId) {
       const url = `${window.location.origin}${window.location.pathname}?spaceId=${spaceId}&userId=${userId}&role=mobile`;
