@@ -46,17 +46,17 @@ function updateStatusUI(socket, role) {
   }
 
   if (!socketConnected) {
-    // ✅ Prevent ghost peer states
-    connectedToWeb = false;
-    connectedToMobile = false;
+  // ✅ Prevent ghost peer states
+  if (role === "web") connectedToWeb = false;
+  if (role === "mobile") connectedToMobile = false;
 
-    statusEl.innerText = role === "web"
-      ? "🖥️ Reconnecting..."
-      : "📱 Reconnecting...";
-    statusEl.style.backgroundColor = "#6c5ce7";
-    return;
-  }
-
+  statusEl.innerText = role === "web"
+    ? "🖥️ Reconnecting..."
+    : "📱 Reconnecting...";
+  statusEl.style.backgroundColor = "#6c5ce7";
+  return;
+}
+  
   if (connectedToWeb && connectedToMobile) {
     statusEl.innerText = "✅ Connected on both devices";
     statusEl.style.backgroundColor = "#27ae60";
