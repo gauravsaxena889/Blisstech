@@ -80,9 +80,11 @@ function simulateFallback(socket, role) {
   });
 
   socket.on("mobile-disconnected", () => {
-    console.log("📴 Mobile disconnected");
-    connectedToMobile = false;
-    updateStatusUI();
+    console.log("📴 Mobile disconnected (event)");
+    if (window.role === "web") {
+      connectedToMobile = false;
+      updateStatusUI();
+    }
   });
 
   socket.on("web-joined", () => {
@@ -92,9 +94,11 @@ function simulateFallback(socket, role) {
   });
 
   socket.on("web-disconnected", () => {
-    console.log("🛑 Web disconnected");
-    connectedToWeb = false;
-    updateStatusUI();
+    console.log("🛑 Web disconnected (event)");
+    if (window.role === "mobile") {
+      connectedToWeb = false;
+      updateStatusUI();
+    }
   });
 
   updateStatusUI();
@@ -102,7 +106,7 @@ function simulateFallback(socket, role) {
 
 window.FallbackUI = {
   init(socket, role) {
-    // 🌐 1. Local guess for immediate feedback
+    // 🌐 1. Instant local guess
     if (role === "web") {
       connectedToWeb = socket.connected;
     } else {
@@ -110,7 +114,6 @@ window.FallbackUI = {
     }
 
     updateStatusUI();
-
     simulateFallback(socket, role);
 
     socket.off("disconnect").on("disconnect", () => {
@@ -118,6 +121,15 @@ window.FallbackUI = {
       if (role === "web") connectedToWeb = false;
       else connectedToMobile = false;
       updateStatusUI();
+
+      // ✅ trigger verified ping to confirm peer status
+      const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
+      if (spaceId) {
+        setTimeout(() => {
+          console.log("📡 Post-disconnect manual ping");
+          socket.emit("manual-ping", { spaceId });
+        }, 1000);
+      }
     });
 
     socket.off("connect").on("connect", () => {
@@ -141,7 +153,7 @@ window.FallbackUI = {
       updateStatusUI();
     });
 
-    // 🧠 2. Verified presence from the start
+    // ✅ Initial verification on first join
     const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
     if (spaceId) {
       console.log("📡 Sending initial manual-ping for verified status");
