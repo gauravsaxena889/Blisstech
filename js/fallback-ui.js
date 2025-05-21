@@ -1,4 +1,4 @@
-// fallback-ui.js — Final Fix with accurate role detection and scoped disconnect handling
+// fallback-ui.js — Final Version Synced with Latest server.js
 
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
@@ -75,12 +75,16 @@ function simulateFallback(socket, role) {
 
   socket.on("presence-update", ({ users }) => {
     console.log("📡 presence-update →", users);
+
+    // Trust server data first
     connectedToWeb = users.some(u => u.role === "web");
     connectedToMobile = users.some(u => u.role === "mobile");
 
-    if (role === "web" && socket.connected) connectedToWeb = true;
-    if (role === "mobile" && socket.connected) connectedToMobile = true;
+    // Override if this is the current device
+    if (role === "web") connectedToWeb = socket.connected;
+    if (role === "mobile") connectedToMobile = socket.connected;
 
+    console.log(`🔁 Web: ${connectedToWeb}, Mobile: ${connectedToMobile}`);
     updateStatusUI();
   });
 
@@ -98,11 +102,11 @@ window.FallbackUI = {
       console.warn("⚠️ Socket disconnected");
 
       if (role === "web") {
-        console.warn("🛑 Web has disconnected");
         connectedToWeb = false;
+        console.warn("🛑 Web has disconnected");
       } else if (role === "mobile") {
-        console.warn("📴 Mobile has disconnected");
         connectedToMobile = false;
+        console.warn("📴 Mobile has disconnected");
       }
 
       updateStatusUI();
