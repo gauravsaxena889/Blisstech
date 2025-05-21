@@ -1,5 +1,5 @@
-// ✅ Final Fallback Logic for Manvas UI (Corrected Base Logic + Hybrid)
-// Handles 16 scenarios + navigator.onLine + server ping with precise peer visibility logic
+// ✅ Final Fallback Logic for Manvas UI (Stable Version)
+// Covers 16 scenarios + hybrid detection + accurate peer state
 
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
@@ -26,7 +26,6 @@ if (!statusEl) {
 
 let connectedToWeb = false;
 let connectedToMobile = false;
-let lastPresence = [];
 
 function updateStatusUI(socket, role) {
   const socketConnected = socket.connected;
@@ -47,7 +46,13 @@ function updateStatusUI(socket, role) {
   }
 
   if (!socketConnected) {
-    statusEl.innerText = role === "web" ? "🖥️ Reconnecting..." : "📱 Reconnecting...";
+    // ✅ Prevent ghost peer states
+    connectedToWeb = false;
+    connectedToMobile = false;
+
+    statusEl.innerText = role === "web"
+      ? "🖥️ Reconnecting..."
+      : "📱 Reconnecting...";
     statusEl.style.backgroundColor = "#6c5ce7";
     return;
   }
@@ -68,7 +73,6 @@ function updateStatusUI(socket, role) {
 }
 
 function handlePresence(users, socket, role) {
-  lastPresence = users;
   connectedToWeb = users.some(u => u.role === "web");
   connectedToMobile = users.some(u => u.role === "mobile");
   updateStatusUI(socket, role);
@@ -88,7 +92,6 @@ function setupFallbackListeners(socket, role) {
     console.warn("⚠️ Socket disconnected");
     if (role === "web") connectedToWeb = false;
     if (role === "mobile") connectedToMobile = false;
-    // Do not clear peer state — let presence-update decide
     updateStatusUI(socket, role);
   });
 
