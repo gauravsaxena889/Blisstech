@@ -105,11 +105,8 @@ window.FallbackUI = {
     socket.off("disconnect").on("disconnect", () => {
       console.warn("⚠️ Socket disconnected");
 
-      if (role === "web") {
-        connectedToWeb = false;
-      } else {
-        connectedToMobile = false;
-      }
+      if (role === "web") connectedToWeb = false;
+      else connectedToMobile = false;
 
       updateStatusUI();
     });
@@ -122,19 +119,24 @@ window.FallbackUI = {
       const currentRole = window.role || role;
 
       if (spaceId && userId && socket.connected) {
-        console.log("🧠 Waiting to rejoin space...");
+        console.log("🧠 Rejoining space...");
         setTimeout(() => {
           socket.emit("join-space", { spaceId, userId, role: currentRole });
-          console.log("🔁 Rejoining space:", spaceId);
-
           setTimeout(() => {
-            console.log("📡 Sending manual-ping for verified presence");
+            console.log("📡 Sending manual-ping after reconnect");
             socket.emit("manual-ping", { spaceId });
-          }, 1500);
-        }, 1500);
+          }, 1000);
+        }, 1000);
       }
 
       updateStatusUI();
     });
+
+    // ✅ Trigger manual-ping immediately on first load
+    const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
+    if (spaceId) {
+      console.log("📡 Sending initial manual-ping for verified status");
+      socket.emit("manual-ping", { spaceId });
+    }
   }
 };
