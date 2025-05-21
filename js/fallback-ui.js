@@ -1,4 +1,4 @@
-// fallback-ui.js — Final Version Synced with Latest server.js
+// fallback-ui.js — FINAL FIX with correct role sync
 
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
@@ -76,15 +76,22 @@ function simulateFallback(socket, role) {
   socket.on("presence-update", ({ users }) => {
     console.log("📡 presence-update →", users);
 
-    // Trust server data first
-    connectedToWeb = users.some(u => u.role === "web");
-    connectedToMobile = users.some(u => u.role === "mobile");
+    const isWebPresent = users.some(u => u.role === "web");
+    const isMobilePresent = users.some(u => u.role === "mobile");
 
-    // Override if this is the current device
-    if (role === "web") connectedToWeb = socket.connected;
-    if (role === "mobile") connectedToMobile = socket.connected;
+    // Reset
+    connectedToWeb = false;
+    connectedToMobile = false;
 
-    console.log(`🔁 Web: ${connectedToWeb}, Mobile: ${connectedToMobile}`);
+    if (role === "web") {
+      connectedToWeb = socket.connected;
+      connectedToMobile = isMobilePresent;
+    } else if (role === "mobile") {
+      connectedToMobile = socket.connected;
+      connectedToWeb = isWebPresent;
+    }
+
+    console.log(`🔁 State → Web: ${connectedToWeb}, Mobile: ${connectedToMobile}`);
     updateStatusUI();
   });
 
