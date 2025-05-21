@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Manvas • Fallback Debug</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    body { margin: 0; font-family: 'Inter', sans-serif; display: flex; height: 100vh; }
+    .left, .right {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; padding: 30px;
+    }
+    .left { background: #f0f4ff; border-right: 1px solid #ddd; }
+    .right { background: #ffffff; }
+    canvas { background: white; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
+    input, button {
+      padding: 10px; margin-top: 10px; font-size: 14px;
+      border-radius: 6px; border: 1px solid #aaa;
+    }
+    button {
+      background-color: #6c5ce7; color: white; border: none;
+      cursor: pointer; width: 120px;
+    }
+    button:hover { background-color: #4b32b6; }
+    #log {
+      position: fixed; bottom: 20px; left: 20px; right: 20px;
+      max-height: 180px; overflow-y: auto;
+      background: #111; color: #0f0; padding: 10px;
+      font-size: 12px; font-family: monospace;
+      border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="left">
+    <h2>📱 Scan to Join</h2>
+    <canvas id="qrCanvas"></canvas>
+  </div>
+
+  <div class="right">
+    <h2>🔧 Join or Create Space</h2>
+    <input type="text" id="spaceId" placeholder="e.g. abc-123" />
+    <button onclick="createSpace()">Create</button>
+    <button onclick="joinSpace()">Join</button>
+  </div>
+
+  <div id="log">[log started]</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+  <script>
+    const backend = "https://09af-2401-4900-8844-4fd4-514c-4325-bfd5-34ba.ngrok-free.app";
+    const socket = io(backend);
+    const userId = crypto.randomUUID();
+    const params = new URLSearchParams(location.search);
+    const role = params.get("role") || "web";
+    const spaceIdParam = params.get("spaceId");
+
+    const log = msg => {
+      const logEl = document.getElementById("log");
+      const now = new Date().toLocaleTimeString();
+      logEl.innerText += `\n[${now}] ${msg}`;
+      logEl.scrollTop = logEl.scrollHeight;
+    };
+
+    function renderQR(spaceId) {
+      const url = `${window.location.origin}${window.location.pathname}?spaceId=${spaceId}&userId=${userId}&role=mobile`;
+      QRCode.toCanvas(document.getElementById("qrCanvas"), url, err => {
+        if (err) log("QR error: " + err);
+        else log("QR generated for mobile: " + url);
+      });
+    }
+
+    function createSpace() {
+      fetch(backend + "/create-space", { method: "POST" })
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("spaceId").value = data.spaceId;
+          renderQR(data.spaceId);
+          socket.emit("join-space", { spaceId: data.spaceId, userId, role });
+          log("Created and joined space as " + role);
+        })
+        .catch(() => log("❌ Failed to create space"));
+    }
+
+    function joinSpace() {
+      const spaceId = document.getElementById("spaceId").value.trim();
+      if (!spaceId) return alert("Enter a space ID");
+      fetch(backend + "/join-space", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spaceId })
+      })
+      .then(res => {
+        if (!res.ok) throw new Error("Not found");
+        renderQR(spaceId);
+        socket.emit("join-space", { spaceId, userId, role });
+        log("Joined space as " + role);
+      })
+      .catch(err => log("❌ Join error: " + err.message));
+    }
+
+    socket.on("connect", () => log("✅ Connected to socket"));
+    socket.on("disconnect", () => log("❌ Disconnected from socket"));
+    socket.on("web-joined", () => log("🖥️ Web joined"));
+    socket.on("mobile-joined", () => log("📱 Mobile joined"));
+    socket.on("web-disconnected", () => log("📴 Web disconnected"));
+    socket.on("mobile-disconnected", () => log("📴 Mobile disconnected"));
+
+    window.onload = () => {
+      if (spaceIdParam) {
+        document.getElementById("spaceId").value = spaceIdParam;
+        socket.emit("join-space", { spaceId: spaceIdParam, userId, role });
+        renderQR(spaceIdParam);
+        log("Auto-joined space from URL as " + role);
+      } else {
+        renderQR("pending");
+      }
+    };
+  </script>
+</body>
+</html>

@@ -1,68 +1,122 @@
-// fallback-ui.js
-const statusEl = document.createElement("div");
-statusEl.style.position = "fixed";
-statusEl.style.bottom = "20px";
-statusEl.style.right = "20px";
-statusEl.style.padding = "12px 20px";
-statusEl.style.borderRadius = "8px";
-statusEl.style.fontFamily = "Inter, sans-serif";
-statusEl.style.fontSize = "14px";
-statusEl.style.color = "#fff";
-statusEl.style.backgroundColor = "#6c5ce7";
-statusEl.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
-statusEl.style.zIndex = 9999;
-statusEl.innerText = "🔄 Connecting...";
-document.body.appendChild(statusEl);
+// ✅ Final Fallback Logic for Manvas UI (Stable Version)
+// Covers 16 scenarios + hybrid detection + accurate peer state
+
+let statusEl = document.getElementById("fallbackStatus");
+if (!statusEl) {
+  statusEl = document.createElement("div");
+  statusEl.id = "fallbackStatus";
+  Object.assign(statusEl.style, {
+    position: "fixed",
+    top: "10px",
+    right: "10px",
+    padding: "10px 16px",
+    borderRadius: "8px",
+    fontFamily: "Inter, sans-serif",
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#fff",
+    backgroundColor: "#6c5ce7",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+    zIndex: 9999,
+    transition: "all 0.3s ease-in-out"
+  });
+  statusEl.innerText = "🔄 Initializing...";
+  document.body.appendChild(statusEl);
+}
 
 let connectedToWeb = false;
 let connectedToMobile = false;
 
-function updateStatusUI() {
+function updateStatusUI(socket, role) {
+  const socketConnected = socket.connected;
+  const browserOnline = navigator.onLine;
+
+  console.log("🔁 UI State:", {
+    role,
+    socketConnected,
+    browserOnline,
+    connectedToWeb,
+    connectedToMobile
+  });
+
+  if (!browserOnline) {
+    statusEl.innerText = "📡 No internet connection";
+    statusEl.style.backgroundColor = "#c0392b";
+    return;
+  }
+
+  if (!socketConnected) {
+  // ✅ Prevent ghost peer states
+  if (role === "web") connectedToWeb = false;
+  if (role === "mobile") connectedToMobile = false;
+
+  statusEl.innerText = role === "web"
+    ? "🖥️ Reconnecting..."
+    : "📱 Reconnecting...";
+  statusEl.style.backgroundColor = "#6c5ce7";
+  return;
+}
+  
   if (connectedToWeb && connectedToMobile) {
     statusEl.innerText = "✅ Connected on both devices";
     statusEl.style.backgroundColor = "#27ae60";
-  } else if (connectedToWeb) {
+  } else if (role === "web" && connectedToWeb) {
     statusEl.innerText = "🖥️ Connected on Web";
     statusEl.style.backgroundColor = "#2980b9";
-  } else if (connectedToMobile) {
+  } else if (role === "mobile" && connectedToMobile) {
     statusEl.innerText = "📱 Connected on Mobile";
     statusEl.style.backgroundColor = "#f39c12";
   } else {
-    statusEl.innerText = "🔄 Waiting for connection...";
+    statusEl.innerText = "🔄 Verifying peer connection...";
     statusEl.style.backgroundColor = "#6c5ce7";
   }
 }
 
-// simulate socket fallback triggers
-function simulateFallback(socket, currentRole) {
-  if (currentRole === "web") {
-    connectedToWeb = true;
-    socket.on("mobile-joined", () => {
-      connectedToMobile = true;
-      updateStatusUI();
-    });
-    socket.on("mobile-disconnected", () => {
-      connectedToMobile = false;
-      updateStatusUI();
-    });
-  } else if (currentRole === "mobile") {
-    connectedToMobile = true;
-    socket.on("web-joined", () => {
-      connectedToWeb = true;
-      updateStatusUI();
-    });
-    socket.on("web-disconnected", () => {
-      connectedToWeb = false;
-      updateStatusUI();
-    });
-  }
-
-  updateStatusUI();
+function handlePresence(users, socket, role) {
+  connectedToWeb = users.some(u => u.role === "web");
+  connectedToMobile = users.some(u => u.role === "mobile");
+  updateStatusUI(socket, role);
 }
 
-// expose for import
+function setupFallbackListeners(socket, role) {
+  [
+    "web-joined", "web-disconnected",
+    "mobile-joined", "mobile-disconnected",
+    "presence-update", "verified-presence"
+  ].forEach(e => socket.off(e));
+
+  socket.on("presence-update", ({ users }) => handlePresence(users, socket, role));
+  socket.on("verified-presence", ({ users }) => handlePresence(users, socket, role));
+
+  socket.on("disconnect", () => {
+    console.warn("⚠️ Socket disconnected");
+    if (role === "web") connectedToWeb = false;
+    if (role === "mobile") connectedToMobile = false;
+    updateStatusUI(socket, role);
+  });
+
+  socket.on("connect", () => {
+    console.log("✅ Socket reconnected");
+    updateStatusUI(socket, role);
+
+    const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
+    const userId = localStorage.getItem("userId");
+    if (spaceId && userId) {
+      socket.emit("join-space", { spaceId, userId, role });
+      setTimeout(() => socket.emit("manual-ping", { spaceId }), 1000);
+    }
+  });
+
+  window.addEventListener("online", () => updateStatusUI(socket, role));
+  window.addEventListener("offline", () => updateStatusUI(socket, role));
+}
+
 window.FallbackUI = {
   init(socket, role) {
-    simulateFallback(socket, role);
+    setupFallbackListeners(socket, role);
+    updateStatusUI(socket, role);
+
+    const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
+    if (spaceId) socket.emit("manual-ping", { spaceId });
   }
 };

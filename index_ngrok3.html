@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -90,29 +91,30 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script src="./js/fallback-ui.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="./js/fallback-ui.js"></script>
 
   <script>
-    //const socket = io();
-	const backend= "https://09af-2401-4900-8844-4fd4-514c-4325-bfd5-34ba.ngrok-free.app" 
-	const socket = io(backend);
+    const backend = "https://09af-2401-4900-8844-4fd4-514c-4325-bfd5-34ba.ngrok-free.app";
+    const socket = io(backend, {
+      transports: ['websocket'],
+      secure: true
+    });
     const userId = crypto.randomUUID();
-    const role = "mobile";
+    const params = new URLSearchParams(location.search);
+    const role = params.get("role") || "web";
+    const joinedSpace = params.get("spaceId");
 
     function renderQR(spaceId) {
-      const url = `${window.location.origin}/space.html?spaceId=${spaceId}&userId=${userId}&role=${role}`;
-      QRCode.toCanvas(document.getElementById("qrCanvas"), url, function (error) {
-        if (error) {
-          console.error(error);
-        } else {
-          console.log("✅ QR rendered for:", url);
-        }
+      const url = `${window.location.origin}/Blisstech/index_ngrok3.html?spaceId=${spaceId}&userId=${userId}&role=mobile`;
+      QRCode.toCanvas(document.getElementById("qrCanvas"), url, (err) => {
+        if (err) console.error("❌ QR render failed:", err);
+        else console.log("✅ QR rendered for:", url);
       });
     }
 
     function createSpace() {
-      fetch(backend+'/create-space', { method: 'POST' })
+      fetch(backend + "/create-space", { method: 'POST' })
         .then(res => res.json())
         .then(data => {
           document.getElementById("spaceId").value = data.spaceId;
@@ -122,27 +124,42 @@
         .catch(err => alert("❌ Failed to create space"));
     }
 
-    function joinSpace() {
-      const spaceId = document.getElementById("spaceId").value.trim();
-      if (!spaceId) return alert("Enter a valid space ID");
+  function joinSpace() {
+  const spaceId = document.getElementById("spaceId").value.trim();
+  if (!spaceId) {
+    alert("Enter a valid space ID");
+    return;
+  }
 
-      fetch(backend+'/join-space', {
-        method: 'POST',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spaceId })
-      })
-      .then(res => {
-        if (!res.ok) throw new Error("Space not found");
-        renderQR(spaceId);
-        socket.emit("join-space", { spaceId, userId, role });
-      })
-      .catch(err => alert("❌ " + err.message));
-    }
+  fetch(backend + "/join-space", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ spaceId })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Space not found");
+    console.log(`🔗 Joined space: ${spaceId} as ${role}`);
+    renderQR(spaceId); // optional for re-pairing
+    socket.emit("join-space", { spaceId, userId, role });
+    FallbackUI.init(socket, role); // activate UI feedback
+  })
+  .catch(err => {
+    alert("❌ " + err.message);
+    console.error("❌ Join failed:", err);
+  });
+}
 
     window.onload = () => {
-      renderQR("pending");
+      if (joinedSpace) {
+        document.getElementById("spaceId").value = joinedSpace;
+        socket.emit("join-space", { spaceId: joinedSpace, userId, role });
+        renderQR(joinedSpace);
+      } else {
+        renderQR("pending");
+      }
       FallbackUI.init(socket, role);
     };
   </script>
+
 </body>
 </html>
