@@ -71,6 +71,19 @@ function simulateFallback(socket, role) {
 
   socket.on("presence-update", ({ users }) => {
     console.log("📡 presence-update →", users);
+
+    const isWeb = users.some(u => u.role === "web");
+    const isMobile = users.some(u => u.role === "mobile");
+
+    if (window.role === "web") {
+      connectedToWeb = true;
+      connectedToMobile = isMobile;
+    } else if (window.role === "mobile") {
+      connectedToMobile = true;
+      connectedToWeb = isWeb;
+    }
+
+    updateStatusUI();
   });
 
   socket.on("mobile-joined", () => {
