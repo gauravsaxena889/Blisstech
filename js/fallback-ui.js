@@ -1,5 +1,3 @@
-// fallback-ui.js — FINAL FIX with correct role sync
-
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
   statusEl = document.createElement("div");
@@ -46,8 +44,29 @@ function simulateFallback(socket, role) {
     "mobile-disconnected",
     "web-joined",
     "web-disconnected",
-    "presence-update"
+    "presence-update",
+    "verified-presence"
   ].forEach(event => socket.off(event));
+
+  socket.on("verified-presence", ({ users }) => {
+    const isWeb = users.some(u => u.role === "web");
+    const isMobile = users.some(u => u.role === "mobile");
+
+    if (role === "web") {
+      connectedToWeb = true;
+      connectedToMobile = isMobile;
+    } else if (role === "mobile") {
+      connectedToMobile = true;
+      connectedToWeb = isWeb;
+    }
+
+    console.log("✅ Verified Presence:", users);
+    updateStatusUI();
+  });
+
+  socket.on("presence-update", ({ users }) => {
+    console.log("📡 presence-update →", users);
+  });
 
   socket.on("mobile-joined", () => {
     console.log("📲 Mobile joined");
@@ -73,28 +92,6 @@ function simulateFallback(socket, role) {
     updateStatusUI();
   });
 
-  socket.on("presence-update", ({ users }) => {
-    console.log("📡 presence-update →", users);
-
-    const isWebPresent = users.some(u => u.role === "web");
-    const isMobilePresent = users.some(u => u.role === "mobile");
-
-    // Reset
-    connectedToWeb = false;
-    connectedToMobile = false;
-
-    if (role === "web") {
-      connectedToWeb = socket.connected;
-      connectedToMobile = isMobilePresent;
-    } else if (role === "mobile") {
-      connectedToMobile = socket.connected;
-      connectedToWeb = isWebPresent;
-    }
-
-    console.log(`🔁 State → Web: ${connectedToWeb}, Mobile: ${connectedToMobile}`);
-    updateStatusUI();
-  });
-
   updateStatusUI();
 }
 
@@ -110,10 +107,8 @@ window.FallbackUI = {
 
       if (role === "web") {
         connectedToWeb = false;
-        console.warn("🛑 Web has disconnected");
-      } else if (role === "mobile") {
+      } else {
         connectedToMobile = false;
-        console.warn("📴 Mobile has disconnected");
       }
 
       updateStatusUI();
@@ -127,18 +122,16 @@ window.FallbackUI = {
       const currentRole = window.role || role;
 
       if (spaceId && userId && socket.connected) {
-        console.log("🧠 Waiting for presence-update to restore state...");
+        console.log("🧠 Waiting to rejoin space...");
         setTimeout(() => {
-          console.log("⏳ Waiting 2s before rejoining space...");
           socket.emit("join-space", { spaceId, userId, role: currentRole });
-          simulateFallback(socket, currentRole);
           console.log("🔁 Rejoining space:", spaceId);
 
           setTimeout(() => {
-            console.log("🔍 Final UI fallback after rejoin");
+            console.log("📡 Sending manual-ping for verified presence");
             socket.emit("manual-ping", { spaceId });
-          }, 3000);
-        }, 2000);
+          }, 1500);
+        }, 1500);
       }
 
       updateStatusUI();
