@@ -131,13 +131,20 @@ window.FallbackUI = {
 
     socket.off("disconnect").on("disconnect", () => {
       console.warn("⚠️ Socket disconnected");
+
+      // Always reset own state
       if (role === "web") connectedToWeb = false;
       else connectedToMobile = false;
+
+      // 🚨 Force-clear peer state (in case event doesn't arrive)
+      if (role === "mobile") connectedToWeb = false;
+      if (role === "web") connectedToMobile = false;
+
       updateStatusUI();
 
-      // ✅ trigger verified ping to confirm peer status
+      // Only emit ping if socket is still alive
       const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
-      if (spaceId) {
+      if (spaceId && socket.connected) {
         setTimeout(() => {
           console.log("📡 Post-disconnect manual ping");
           socket.emit("manual-ping", { spaceId });
