@@ -23,6 +23,11 @@ let connectedToWeb = false;
 let connectedToMobile = false;
 
 function updateStatusUI() {
+  console.log("🧾 UI Update →", {
+    connectedToWeb,
+    connectedToMobile
+  });
+
   if (connectedToWeb && connectedToMobile) {
     statusEl.innerText = "✅ Connected on both devices";
     statusEl.style.backgroundColor = "#27ae60";
@@ -97,7 +102,7 @@ function simulateFallback(socket, role) {
 
 window.FallbackUI = {
   init(socket, role) {
-    // 🌐 1. Instant local guess
+    // 🌐 1. Local guess for immediate feedback
     if (role === "web") {
       connectedToWeb = socket.connected;
     } else {
@@ -136,7 +141,7 @@ window.FallbackUI = {
       updateStatusUI();
     });
 
-    // 🧠 2. Verified presence to fix it after initial guess
+    // 🧠 2. Verified presence from the start
     const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
     if (spaceId) {
       console.log("📡 Sending initial manual-ping for verified status");
