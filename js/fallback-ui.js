@@ -97,17 +97,21 @@ function simulateFallback(socket, role) {
 
 window.FallbackUI = {
   init(socket, role) {
-    connectedToWeb = false;
-    connectedToMobile = false;
+    // 🌐 1. Instant local guess
+    if (role === "web") {
+      connectedToWeb = socket.connected;
+    } else {
+      connectedToMobile = socket.connected;
+    }
+
+    updateStatusUI();
 
     simulateFallback(socket, role);
 
     socket.off("disconnect").on("disconnect", () => {
       console.warn("⚠️ Socket disconnected");
-
       if (role === "web") connectedToWeb = false;
       else connectedToMobile = false;
-
       updateStatusUI();
     });
 
@@ -132,7 +136,7 @@ window.FallbackUI = {
       updateStatusUI();
     });
 
-    // ✅ Trigger manual-ping immediately on first load
+    // 🧠 2. Verified presence to fix it after initial guess
     const spaceId = window.joinedSpace || localStorage.getItem("lastSpace");
     if (spaceId) {
       console.log("📡 Sending initial manual-ping for verified status");
