@@ -1,4 +1,4 @@
-// fallback-ui.js — Final Fix with accurate role detection
+// fallback-ui.js — Final Fix with accurate role detection and scoped disconnect handling
 
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
@@ -96,8 +96,15 @@ window.FallbackUI = {
 
     socket.off("disconnect").on("disconnect", () => {
       console.warn("⚠️ Socket disconnected");
-      connectedToWeb = false;
-      connectedToMobile = false;
+
+      if (role === "web") {
+        console.warn("🛑 Web has disconnected");
+        connectedToWeb = false;
+      } else if (role === "mobile") {
+        console.warn("📴 Mobile has disconnected");
+        connectedToMobile = false;
+      }
+
       updateStatusUI();
     });
 
