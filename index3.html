@@ -93,7 +93,9 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="/fallback-ui.js"></script>
   <script>
-    const socket = io();
+    //const socket = io();
+	const backend= "https://09af-2401-4900-8844-4fd4-514c-4325-bfd5-34ba.ngrok-free.app" 
+	const socket = io(backend);
     const userId = crypto.randomUUID();
     const role = "mobile";
 
@@ -109,7 +111,7 @@
     }
 
     function createSpace() {
-      fetch('/create-space', { method: 'POST' })
+      fetch(backend+'/create-space', { method: 'POST' })
         .then(res => res.json())
         .then(data => {
           document.getElementById("spaceId").value = data.spaceId;
@@ -123,7 +125,7 @@
       const spaceId = document.getElementById("spaceId").value.trim();
       if (!spaceId) return alert("Enter a valid space ID");
 
-      fetch('/join-space', {
+      fetch(backend+'/join-space', {
         method: 'POST',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ spaceId })
