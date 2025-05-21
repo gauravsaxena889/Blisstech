@@ -1,5 +1,5 @@
-// ✅ Final Fallback Logic for Manvas UI (Hybrid Enhanced)
-// Handles 16 scenarios + combines navigator.onLine + socket + ping
+// ✅ Final Fallback Logic for Manvas UI (Hybrid Enhanced + Fixed Case #6)
+// Handles all 16 scenarios + navigator.onLine + server ping
 
 let statusEl = document.getElementById("fallbackStatus");
 if (!statusEl) {
@@ -86,6 +86,7 @@ function setupFallbackListeners(socket, role) {
     console.warn("⚠️ Socket disconnected");
     if (role === "web") connectedToWeb = false;
     if (role === "mobile") connectedToMobile = false;
+    // ❌ Do not force peer disconnected — let server confirm
     updateStatusUI(socket, role);
   });
 
